@@ -27,11 +27,6 @@ class Jamboree(EventProcessor):
         self.redis = Redis(redis_host, port=redis_port)
         self.store = Store(mongodb_host).create_lib('events').get_store()['events']
     
-    # def _redis_lock(self, _hash:str):
-    #     rlock = f"{_hash}:lock"
-    #     return self.redis.Lock(self.redis, rlock)
-
-    
     def _validate_query(self, query:dict):
         """ Validates a query. Must have `type` and a second identifier at least"""
         if 'type' not in query:
@@ -110,16 +105,17 @@ class Jamboree(EventProcessor):
 
         # self.redis.rename(_hash_key, _hash_rename)
         mongo_data = list(self.store.query(query))
+        rlock = f"{_hash}:lock"
+        with self.redis.lock(rlock):
+            # placeholder key
+            for md in mongo_data:
+                self.redis.rpush(_hash_placeholder, orjson.dumps(md))
+
+            self.redis.rename(_hash_key, _hash_del)
+            self.redis.rename(_hash_placeholder, _hash_key)
         
-        # placeholder key
-        for md in mongo_data:
-            self.redis.rpush(_hash_placeholder, orjson.dumps(md))
 
-
-        self.redis.rename(_hash_key, _hash_del)
-        self.redis.rename(_hash_placeholder, _hash_key)
-        while self.redis.llen(_hash_del) > 0:
-            self.redis.ltrim(_hash_del, 0, -99)
+        self._concurrent_delete_list(_hash_del)
 
     def _save(self, query:dict, data:dict):
         """
@@ -145,11 +141,76 @@ class Jamboree(EventProcessor):
             # Log a warning here instead
             return
         self._reset_count(query)
+    
+    def _search_one(self, item:dict, query:dict):
+        item_keys = item.keys()
+        all_bools = []
+        for q in query:
+            if q in item:
+                if query[q] == query[q]:
+                    all_bools.append(True)
+                else:
+                    all_bools.append(False)
+            else:
+                all_bools.append(False)
+        return any(all_bools)
+
+
+    @concurrent.thread
+    def _concurrent_delete_list(self, key):
+        while self.redis.llen(key) > 0:
+            self.redis.ltrim(key, 0, -99)
+
+    @concurrent.thread
+    def _concurrent_delete_many(self, query:dict, details:dict):
+        # combine query and details
+        query.update(details)
+        self.store.delete_many(query)
+
+    def _remove(self, query:dict, details:dict):
+        """ Use to both remove items from redis and mongo. Add it when you need it."""
+
+        """ 
+            Removes the given query information from the database. 
+            It's a heavy computation on redis, as it'll require searching an entire list.
+            
+        """
+        # Deletes from mongo concurrently
+        self._concurrent_delete_many(query, details)
+        _hash = self._generate_hash(query)
+        count = self._get_count(_hash, query)
+        phindex = self.redis.incr("placeholder_del:index")
+        placeholder_hash = f"{_hash}:placeholder:{phindex}"
+        placeholder_hash_del = f"{_hash}:placeholder_del:{phindex}"
+        push_key = f"{_hash}:list"
+        rlock = f"{_hash}:lock"
+        
+        with self.redis.lock(rlock):
+            all_matching_redis_items = self.back_to_dict(self.redis.lrange(push_key, 0, -1))
+            if isinstance(all_matching_redis_items, dict):
+                """ Remove replace the current list with the empty one"""
+                is_true = self._search_one(all_matching_redis_items, details)
+                if is_true == False: return
+                self.redis.rpush(placeholder_hash, orjson.dumps(all_matching_redis_items))
+            else:
+                for match in all_matching_redis_items:
+                    is_true = self._search_one(match, details)
+                    if is_true:
+                        self.redis.rpush(placeholder_hash, orjson.dumps(match))
+
+
+            self.redis.rename(push_key, placeholder_hash_del)
+            self.redis.rename(placeholder_hash, push_key)
+        
+        
+        # Delete while unlocked.
+        self._concurrent_delete_list(placeholder_hash_del)
+        
+    
 
 
 
     def save(self, query:dict, data:dict):
-        # print("Query")
         self._save(query, data)
     
     
@@ -200,8 +261,7 @@ class Jamboree(EventProcessor):
             latest_items = list(self.store.query_latest(query))
             self.reset(query)
             return latest_items
-
-
+        
         return latest_redis_items
         
         

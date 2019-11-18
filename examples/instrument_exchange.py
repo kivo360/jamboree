@@ -25,7 +25,8 @@ class SampleEnvHandler(DBHandler):
     """Abstract handler that we use to keep track of information.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self):
+        # mongodb_host= "localhost", redis_host="localhost", redis_port=6379
         super().__init__()
         self.entity = "sample"
         self.required = {
