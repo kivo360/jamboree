@@ -1,0 +1,15 @@
+redis
+scipy
+numpy
+pandas
+toolz
+funtime
+dask
+vaex
+loguru
+hiredis
+orjson
+pebble
+maya
+ujson
+gym
