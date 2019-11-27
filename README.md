@@ -8,6 +8,10 @@ The goal of jamboree is to have an Event Sourcing Library that stores all prior 
 
 Under the hood, the library uses other libraries to like arctic, pebble, redis and mongo. All of these combined help create concurrent transaction.
 
+## Install
+```
+pip install jamboree
+```
 
 
 ```py
@@ -28,7 +32,6 @@ with timecontext():
 ```
 
 To locate where to place the record inside of `redis` we must have 
-
 
 
 
@@ -110,7 +113,3 @@ if __name__ == "__main__":
     main()
 ```
 
-## Install
-```
-pip install jamboree
-```
