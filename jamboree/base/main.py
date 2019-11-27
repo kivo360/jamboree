@@ -244,7 +244,6 @@ class Jamboree(EventProcessor):
 
         if self._validate_query(query) == False:
             # Log a warning here instead
-            # print("False query")
             return []
         
         _hash = self._generate_hash(query)

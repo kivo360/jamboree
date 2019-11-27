@@ -1,8 +1,36 @@
-# Jamboree - Fast Event-Driven Library 
-An event driven library that is a mix between redis and mongodb. It handles threads in the background and moves relatively fast.
+# Jamboree: Have a Fast Event-Source System Made with MongoDB, Redis and {Heart Emoji}.
+
+**Jamboree is still in Alpha, meaning it should not be used in production systems yet, and it may contain bugs.**
+
+![Logo](docs/jamboree_logo.png)
+
+The goal of jamboree is to have an Event Sourcing Library that stores all prior states of an item located by query key. The purpose of it is to run extremely fast event sourcing for financial transactions from your computer to a large cluster of servers using the exact same code.
+
+Under the hood, the library uses other libraries to like arctic, pebble, redis and mongo. All of these combined help create concurrent transaction.
 
 
-**DO NOT MIND THE POOR DOCS. Everything needs to be worked on later.**
+
+```py
+jambo = Jamboree()
+sample_env_handler = SampleEnvHandler()
+sample_env_handler.limit = 250
+sample_env_handler.event = jambo
+sample_env_handler['episode'] = uuid.uuid1().hex
+with timecontext():
+    for i in range(10000):
+        v1 = randint(0, 12)      
+        sample_env_handler.save({"value": v1})
+        if flip(0.05):
+            sample_env_handler.save_update_recent({"value": v1})
+    
+    print(sample_env_handler.last())
+    print(sample_env_handler.transactions)
+```
+
+To locate where to place the record inside of `redis` we must have 
+
+
+
 
 
 ```py
