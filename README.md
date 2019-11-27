@@ -1,4 +1,4 @@
-# Jamboree: Have a Fast Event-Source System Made with MongoDB, Redis and {Heart Emoji}.
+# Jamboree: Have a Fast Event-Source System Made with MongoDB, Redis and Love.
 
 **Jamboree is still in Alpha, meaning it should not be used in production systems yet, and it may contain bugs.**
 
