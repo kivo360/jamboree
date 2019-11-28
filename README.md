@@ -1,12 +1,13 @@
 # Jamboree: Have a Fast Event-Source System Made with MongoDB, Redis and Love.
 
+![Logo](docs/imgs/jamboree_long.png)
+
 **Jamboree is still in Alpha, meaning it should not be used in production systems yet, and it may contain bugs.**
 
-![Logo](docs/jamboree_logo.png)
 
 The goal of jamboree is to have an Event Sourcing Library that stores all prior states of an item located by query key. The purpose of it is to run extremely fast event sourcing for financial transactions from your computer to a large cluster of servers using the exact same code.
 
-Under the hood, the library uses other libraries to like arctic, pebble, redis and mongo. All of these combined help create concurrent transaction.
+Under the hood, the library uses other libraries to like arctic, `pebble`, `redis` and `mongo`. All of these combined help create concurrent transaction.
 
 ## Install
 ```
@@ -18,7 +19,7 @@ pip install jamboree
 
 Event Sourcing is a round about way of saying tracking information through their interactions over time more so than exact states. It helps us construct a story of all things that have happened in a system over time. It looks like the image below.
 
-![Event Sourcing](docs/event_sourcing.png)
+![Event Sourcing](docs/imgs/event-sourcing_long.png)
 
 
 The ultimate result is that you'd have tracability in your system. This is great when you're trying to see how interactions happen through time.
@@ -26,14 +27,14 @@ The ultimate result is that you'd have tracability in your system. This is great
 
 
 
-## How To Read
+## How The Library Works
 
 The Jamboree Library Is Split In Two Parts:
 
 1. Jamboree Event Sourcing
 2. Object Handler
 
-The `Jamboree` object is rather simple. It only saves, reads, and deletes records in both `redis` and `mongodb`. Redis to give it fast read times, mongodb as backup to the data. `Handlers` have very explicit storage procedures that interact with the Jamboree object. A good example is the code below. It is from the ![examples/instrument_exchange.py](examples/) directory. The idea is straightforward:
+The `Jamboree` object is rather simple. It only saves, reads, and deletes records in both `redis` and `mongodb`. Redis to give it fast read times, mongodb as backup to the data. `Handlers` have very explicit storage procedures that interact with the Jamboree object. A good example is the code below. It is from the ![examples/instrument_exchange.py](./examples/sample_env.py) directory. The idea is straightforward:
 
 1. We create a Jamboree object. The Jamboree object manages connections to the two databases. 
 2. After we create the Handler object, and set the limit (max number of records we want to look at), we start adding records until we stop. At the end, we get the amount of time it took to push the records.
