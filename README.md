@@ -43,25 +43,8 @@ The `Jamboree` object is rather simple. It only saves, reads, and deletes record
 
 If you run the code in instrument exchange, you'll see that 5000 adds to both MongoDB and Redis takes a total of **2.1 seconds** on a single core! For C++ nerds that's nothing, though for the usual developer that's looking to develop an infrastucture, that's fast enough, 2000 adds per second per core, that can also scale horizontally is amazing. They can create server API code around that and create systems that can handle billions of interactions a day. 
 
-```py
-jambo = Jamboree()
-sample_env_handler = SampleEnvHandler()
-sample_env_handler.limit = 250
-sample_env_handler.event = jambo
-sample_env_handler['episode'] = uuid.uuid1().hex
-with timecontext():
-    for i in range(10000):
-        v1 = randint(0, 12)      
-        sample_env_handler.save({"value": v1})
-        if flip(0.05):
-            sample_env_handler.save_update_recent({"value": v1})
-    
-    print(sample_env_handler.last())
-    print(sample_env_handler.transactions)
-```
 
-
-
+## Creating a Handler
 
 ```py
 class SampleEnvHandler(DBHandler):
@@ -139,4 +122,27 @@ def main():
 if __name__ == "__main__":
     main()
 ```
+
+
+## Timing The Handler
+
+
+```py
+jambo = Jamboree()
+sample_env_handler = SampleEnvHandler()
+sample_env_handler.limit = 250
+sample_env_handler.event = jambo
+sample_env_handler['episode'] = uuid.uuid1().hex
+with timecontext():
+    for i in range(10000):
+        v1 = randint(0, 12)      
+        sample_env_handler.save({"value": v1})
+        if flip(0.05):
+            sample_env_handler.save_update_recent({"value": v1})
+    
+    print(sample_env_handler.last())
+    print(sample_env_handler.transactions)
+```
+
+
 
