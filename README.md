@@ -118,14 +118,12 @@ def main():
         print(sample_env_handler.last())
         print(sample_env_handler.transactions)
 
-
 if __name__ == "__main__":
     main()
 ```
 
 
 ## Timing The Handler
-
 
 ```py
 jambo = Jamboree()

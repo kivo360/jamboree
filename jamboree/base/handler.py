@@ -95,6 +95,7 @@ class DBHandler(BaseHandler):
         # check to make sure it's not empty
         self._required = _required
 
+
     @property
     def query(self):
         return self._query
@@ -121,39 +122,47 @@ class DBHandler(BaseHandler):
                 raise AttributeError(f"{req} is not a {_type}")
         return True
     
-    def save(self, data:dict):
+    
+
+    def save(self, data:dict, alt={}):
         self.check()
 
         query = copy.copy(self._query)
         query['type'] = self.entity
+        query.update(alt)
         self.event_proc.save(query, data)
     
-    def _get_many(self, limit:int):
+
+    def _get_many(self, limit:int, alt={}):
         """ Aims to get many variables """
         self.check()
         query = copy.copy(self._query)
         query['type'] = self.entity
+        query.update(alt)
         latest_many = self.event_proc.get_latest_many(query, limit=limit)
         return latest_many
     
-    def _get_latest(self):
+    def _get_latest(self, alt={}):
         self.check()
         query = copy.copy(self._query)
         query['type'] = self.entity
+        query.update(alt)
         latest = self.event_proc.get_latest(query)
         return latest
-    
-    def last(self):
-        return self._get_latest()
-
-    def many(self, limit=1000):
-        return self._get_many(limit)
 
 
-class MetaDBHandler(BaseHandler):
-    """ 
-        Deal with multiple keys at the same time. 
-        Use for exploring multiple entities together.
-    """
-    def __init__(self):
-        pass
+    def last(self, alt={}):
+        return self._get_latest(alt)
+
+
+    def many(self, limit=1000, alt={}):
+        return self._get_many(limit, alt=alt)
+
+
+    def count(self, alt={}):
+        """ Aims to get many variables """
+        self.check()
+        query = copy.copy(self._query)
+        query['type'] = self.entity
+        query.update(alt)
+        return self.event_proc.count(query)

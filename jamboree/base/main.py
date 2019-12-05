@@ -20,6 +20,9 @@ class EventProcessor(ABC):
     
     def save_many(self, query:dict, data:List[dict]):
         raise NotImplementedError
+    
+    def count(self, query:dict):
+        raise NotImplementedError
 
 class Jamboree(EventProcessor):
     """Adds and retrieves events at extremely fast speeds. Use to handle portfolio and trade information quickly."""
@@ -224,7 +227,18 @@ class Jamboree(EventProcessor):
         
         for item in data:
             self._save(query, item)
-
+    
+    def query_direct(self, query):
+        """ Queries from mongodb directly. Used to search extremely large queries. """
+        latest_items = list(self.store.query_latest(query))
+        return latest_items
+    
+    def query_direct_latest(self, query):
+        """ Queries from mongodb directly. Used to search extremely large queries. """
+        latest_items = list(self.store.query_latest(query))
+        if len(latest_items) > 0:
+            return latest_items[0]
+        return {}
 
     def get_latest(self, query):
         """ Gets the latest query"""
@@ -263,4 +277,12 @@ class Jamboree(EventProcessor):
         
         return latest_redis_items
         
+    def count(self, query):
+        """ """
+        if self._validate_query(query) == False:
+            # Log a warning here instead
+            return []
         
+        _hash = self._generate_hash(query)
+        count = self._get_count(_hash, query)
+        return count
