@@ -29,6 +29,8 @@ class BaseHandler(object, metaclass=ABCMeta):
     def many(self, limit=100):
         raise NotImplementedError
     
+    def save_many(self, query, data):
+        raise NotImplementedError
     
 class DBHandler(BaseHandler):
     """ 
@@ -131,6 +133,15 @@ class DBHandler(BaseHandler):
         query['type'] = self.entity
         query.update(alt)
         self.event_proc.save(query, data)
+    
+
+    def save_many(self, data:list, alt={}):
+        self.check()
+
+        query = copy.copy(self._query)
+        query['type'] = self.entity
+        query.update(alt)
+        self.event_proc._bulk_save(query, data)
     
 
     def _get_many(self, limit:int, alt={}):
