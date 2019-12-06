@@ -61,6 +61,23 @@ class Jamboree(EventProcessor):
         with self.redis.lock(rlock):
             push_key = f"{_hash}:list"
             self.redis.rpush(push_key, serialized)
+    
+    def _bulk_save_redis(self, _hash, data:list):
+        serialized_list = [orjson.dumps(x) for x in data]
+        rlock = f"{_hash}:lock"
+        with self.redis.lock(rlock):
+            push_key = f"{_hash}:list"
+            self.redis.rpush(push_key, *serialized_list)
+    
+    @concurrent.thread
+    def _bulk_save_mongo(self, query:dict, data:list):
+        if len(data) == 0:
+            return
+
+        updated_data = [x.update(query) for x in data]
+
+        self.store.bulk_upsert(updated_data, _column_first=query.keys(), _in=['timestamp'])
+
 
     @concurrent.thread
     def _save_mongo(self, data):
@@ -286,3 +303,13 @@ class Jamboree(EventProcessor):
         _hash = self._generate_hash(query)
         count = self._get_count(_hash, query)
         return count
+    
+    def _bulk_save(self, query, data:list):
+        """ Bulk adds a list to redis."""
+        if self._validate_query(query) == False:
+            # Log a warning here instead
+            return
+        _hash = self._generate_hash(query)
+        self._bulk_save_redis(_hash, data)
+        self._bulk_save_mongo(query, data)
+    
