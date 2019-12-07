@@ -169,6 +169,11 @@ class DBHandler(BaseHandler):
     def many(self, limit=1000, alt={}):
         return self._get_many(limit, alt=alt)
 
+    def pop(self, alt={}):
+        query = copy.copy(self._query)
+        query['type'] = self.entity
+        query.update(alt)
+        self.event_proc.remove_first(query)
 
     def count(self, alt={}):
         """ Aims to get many variables """
