@@ -60,13 +60,11 @@ class DBHandler(BaseHandler):
         return self.data
 
     def __getitem__(self, key):
-        if (not bool(self.data)):
-            if key in self.data:
-                return self.data[key]
-        if self.query is not None:
-            if key in self.query:
-                return self.query[key]
-            return None
+        if key in self._query.keys():
+            return self._query.get(key, None)
+        else:
+            if key in self.data.keys():
+                return self.data.get(key, None)
         return None
 
 
