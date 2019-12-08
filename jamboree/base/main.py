@@ -58,6 +58,11 @@ class Jamboree(EventProcessor):
         return True
 
 
+    def _update_dict_query(self, query:dict, data:dict):
+        timestamp = maya.now()._epoch
+        query.update(data)
+        query['timestamp'] = timestamp        
+        return query
 
 
 
@@ -231,13 +236,17 @@ class Jamboree(EventProcessor):
 
 
     def _bulk_save(self, query, data:list):
+        
+
         """ Bulk adds a list to redis."""
-        if self._validate_query(query) == False:
+        if self._validate_query(query) == False or len(data) == 0:
             # Log a warning here instead
             return
+
+        updated_list = [self._update_dict_query(query, x) for x in data]
         _hash = self._generate_hash(query)
-        self._bulk_save_redis(_hash, data)
-        self._bulk_save_mongo(query, data)
+        self._bulk_save_redis(_hash, updated_list)
+        self._bulk_save_mongo(query, updated_list)
     
 
 
@@ -248,7 +257,8 @@ class Jamboree(EventProcessor):
             push_key = f"{_hash}:list"
             self.redis.rpush(push_key, serialized)
     
-    def _bulk_save_redis(self, _hash, data:list):
+    def _bulk_save_redis(self, _hash:str, data:list):
+
         serialized_list = [orjson.dumps(x) for x in data]
         rlock = f"{_hash}:lock"
         with self.redis.lock(rlock):
@@ -261,9 +271,7 @@ class Jamboree(EventProcessor):
         if len(data) == 0:
             return
 
-        updated_data = [x.update(query) for x in data]
-
-        self.store.bulk_upsert(updated_data, _column_first=query.keys(), _in=['timestamp'])
+        self.store.bulk_upsert(data, _column_first=query.keys(), _in=['timestamp'])
 
 
     @concurrent.thread
