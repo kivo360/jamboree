@@ -2,11 +2,12 @@ from abc import ABC
 import maya
 import orjson
 import ujson
-from typing import List, Dict
+from typing import List
 from redis import Redis
 from funtime import Store
-from pebble import concurrent
+from pebble.pool import ThreadPool
 import base64
+from multiprocessing import cpu_count
 
 class EventProcessor(ABC):
     def save(self, query:dict, data:dict):
@@ -32,6 +33,7 @@ class Jamboree(EventProcessor):
     def __init__(self, mongodb_host="localhost", redis_host="localhost", redis_port=6379):
         self.redis = Redis(redis_host, port=redis_port)
         self.store = Store(mongodb_host).create_lib('events').get_store()['events']
+        self.pool = ThreadPool(max_workers=cpu_count()*4)
     
     def _validate_query(self, query:dict):
         """ Validates a query. Must have `type` and a second identifier at least"""
@@ -80,13 +82,6 @@ class Jamboree(EventProcessor):
 
 
 
-
-    def _update_count(self, _hash:str, count:int):
-        _count_hash = f"{_hash}:count"        
-        self.redis.set(_count_hash, count)
-
-
-
     def _save(self, query:dict, data:dict):
         """
             Given a type (data entity), data and a epoch for time (utc time only), save the data in both redis and mongo. 
@@ -103,14 +98,13 @@ class Jamboree(EventProcessor):
         query['timestamp'] = timestamp
         
         self._save_redis(_hash, query)
-        self._save_mongo(query)
+        self.pool.schedule(self._save_mongo, args=(query))
 
 
     """
         RESET FUNCTIONS
     """
 
-    @concurrent.thread
     def _reset_count(self, query:dict):
         """ Reset the count for the current mongodb query"""
         _hash = self._generate_hash(query)
@@ -132,7 +126,7 @@ class Jamboree(EventProcessor):
             self.redis.rename(_hash_key, _hash_del)
             self.redis.rename(_hash_placeholder, _hash_key)
         
-
+        
         self._concurrent_delete_list(_hash_del)
 
 
@@ -142,19 +136,19 @@ class Jamboree(EventProcessor):
         if self._validate_query(query) == False:
             # Log a warning here instead
             return
-        self._reset_count(query)
+        self.pool.schedule(self._reset_count, args=(query))
+        # self._reset_count(query)
     
 
     """
         DELETES FUNCTIONS
     """
 
-    @concurrent.thread
     def _concurrent_delete_list(self, key):
         while self.redis.llen(key) > 0:
             self.redis.ltrim(key, 0, -99)
 
-    @concurrent.thread
+
     def _concurrent_delete_many(self, query:dict, details:dict):
         # combine query and details
         query.update(details)
@@ -169,7 +163,7 @@ class Jamboree(EventProcessor):
             
         """
         # Deletes from mongo concurrently
-        self._concurrent_delete_many(query, details)
+        self.pool.schedule(self._concurrent_delete_many, args=(query, details))
         _hash = self._generate_hash(query)
         count = self._get_count(_hash, query)
         phindex = self.redis.incr("placeholder_del:index")
@@ -195,9 +189,9 @@ class Jamboree(EventProcessor):
             self.redis.rename(push_key, placeholder_hash_del)
             self.redis.rename(placeholder_hash, push_key)
         
-        
+        self.pool.schedule(self._concurrent_delete_list, args=(placeholder_hash_del))
         # Delete while unlocked.
-        self._concurrent_delete_list(placeholder_hash_del)
+        # self._concurrent_delete_list(placeholder_hash_del)
     
     def _remove_first_redis(self, _hash, query:dict):
         rlock = f"{_hash}:lock"
@@ -243,10 +237,11 @@ class Jamboree(EventProcessor):
             # Log a warning here instead
             return
 
-        updated_list = [self._update_dict_query(query, x) for x in data]
+        updated_list = [self._update_dict(query, x) for x in data]
         _hash = self._generate_hash(query)
-        self._bulk_save_redis(_hash, updated_list)
-        self._bulk_save_mongo(query, updated_list)
+        # self._bulk_save_redis(_hash, updated_list)
+        self.pool.schedule(self._bulk_save_redis, args=(_hash, updated_list))
+        self.pool.schedule(self._bulk_save_mongo, args=(query, updated_list))
     
 
 
@@ -266,7 +261,6 @@ class Jamboree(EventProcessor):
             self.redis.rpush(push_key, *serialized_list)
     
 
-    @concurrent.thread
     def _bulk_save_mongo(self, query:dict, data:list):
         if len(data) == 0:
             return
@@ -274,7 +268,6 @@ class Jamboree(EventProcessor):
         self.store.bulk_upsert(data, _column_first=query.keys(), _in=['timestamp'])
 
 
-    @concurrent.thread
     def _save_mongo(self, data):
         self.store.store(data)
 
@@ -385,5 +378,5 @@ class Jamboree(EventProcessor):
             return
         _hash = self._generate_hash(query)
         self._bulk_save_redis(_hash, data)
-        self._bulk_save_mongo(query, data)
+        self.pool.schedule(self._bulk_save_mongo, args=(query, data))
     
