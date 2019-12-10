@@ -23,6 +23,9 @@ class EventProcessor(ABC):
     
     def count(self, query:dict):
         raise NotImplementedError
+    
+    def remove_first(self, query:dict):
+        raise NotImplementedError
 
 class Jamboree(EventProcessor):
     """Adds and retrieves events at extremely fast speeds. Use to handle portfolio and trade information quickly."""
@@ -30,13 +33,6 @@ class Jamboree(EventProcessor):
         self.redis = Redis(redis_host, port=redis_port)
         self.store = Store(mongodb_host).create_lib('events').get_store()['events']
     
-    def _update_dict(self, query:dict, data:dict):
-        timestamp = maya.now()._epoch
-        query['timestamp'] = timestamp
-        data.update(query)
-        return data
-
-
     def _validate_query(self, query:dict):
         """ Validates a query. Must have `type` and a second identifier at least"""
         if 'type' not in query:
@@ -51,6 +47,7 @@ class Jamboree(EventProcessor):
         _hash = ujson.dumps(query, sort_keys=True)
         _hash = base64.b64encode(str.encode(_hash))
         _hash = _hash.decode('utf-8')
+        # print(_hash)
         return _hash
 
     def _check_redis_for_prior(self, _hash:str) -> bool:
@@ -61,34 +58,12 @@ class Jamboree(EventProcessor):
         return True
 
 
-    def _save_redis(self, _hash:str, data:dict):
-        serialized = orjson.dumps(data)
-        rlock = f"{_hash}:lock"
-        with self.redis.lock(rlock):
-            push_key = f"{_hash}:list"
-            self.redis.rpush(push_key, serialized)
-    
-    def _bulk_save_redis(self, _hash, query:dict, data:list):
-        updated_list = [self._update_dict(x, query) for x in data]
-        serialized_list = [orjson.dumps(x) for x in updated_list]
-        rlock = f"{_hash}:lock"
-        with self.redis.lock(rlock):
-            push_key = f"{_hash}:list"
-            self.redis.rpush(push_key, *serialized_list)
-    
-    @concurrent.thread
-    def _bulk_save_mongo(self, query:dict, data:list):
-        if len(data) == 0:
-            return
+    def _update_dict(self, query:dict, data:dict):
+        timestamp = maya.now()._epoch
+        query['timestamp'] = timestamp
+        data.update(query)
+        return data
 
-        updated_data = [x.update(query) for x in data]
-
-        self.store.bulk_upsert(updated_data, _column_first=query.keys(), _in=['timestamp'])
-
-
-    @concurrent.thread
-    def _save_mongo(self, data):
-        self.store.store(data)
 
 
     def back_to_dict(self, list_of_serialized:list):
@@ -101,23 +76,39 @@ class Jamboree(EventProcessor):
             deserialized.append(orjson.loads(i))
         return deserialized
 
-    
-    def _get_count(self, _hash:str, query:dict):
-        # Checks to see if a count already exist in redis, if not, check for a count in mongo.
-        _count_hash = f"{_hash}:list"
-        count = self.redis.llen(_count_hash)
-        if count is not None:
-            return count
-        # Warning slow!!!
-        records = list(self.store.query(query))
-        record_len = len(records)
-        return record_len
+
+
+
 
 
     def _update_count(self, _hash:str, count:int):
         _count_hash = f"{_hash}:count"        
         self.redis.set(_count_hash, count)
 
+
+
+    def _save(self, query:dict, data:dict):
+        """
+            Given a type (data entity), data and a epoch for time (utc time only), save the data in both redis and mongo. 
+            Does it in a background process. Use with add event.
+            We save the information both in mongodb and redis. We assume there's many of each collection. We find a specific collection using the query.
+        """
+        if self._validate_query(query) == False:
+            # Log a warning here instead
+            return
+        timestamp=maya.now()._epoch
+        _hash = self._generate_hash(query)
+        # Now time to update the system
+        query.update(data)
+        query['timestamp'] = timestamp
+        
+        self._save_redis(_hash, query)
+        self._save_mongo(query)
+
+
+    """
+        RESET FUNCTIONS
+    """
 
     @concurrent.thread
     def _reset_count(self, query:dict):
@@ -144,23 +135,7 @@ class Jamboree(EventProcessor):
 
         self._concurrent_delete_list(_hash_del)
 
-    def _save(self, query:dict, data:dict):
-        """
-            Given a type (data entity), data and a epoch for time (utc time only), save the data in both redis and mongo. 
-            Does it in a background process. Use with add event.
-            We save the information both in mongodb and redis. We assume there's many of each collection. We find a specific collection using the query.
-        """
-        if self._validate_query(query) == False:
-            # Log a warning here instead
-            return
-        timestamp=maya.now()._epoch
-        _hash = self._generate_hash(query)
-        # Now time to update the system
-        query.update(data)
-        query['timestamp'] = timestamp
-        
-        self._save_redis(_hash, query)
-        self._save_mongo(query)
+
 
     def reset(self, query:dict):
         """ Resets all of the variables """
@@ -169,19 +144,10 @@ class Jamboree(EventProcessor):
             return
         self._reset_count(query)
     
-    def _search_one(self, item:dict, query:dict):
-        item_keys = item.keys()
-        all_bools = []
-        for q in query:
-            if q in item:
-                if query[q] == query[q]:
-                    all_bools.append(True)
-                else:
-                    all_bools.append(False)
-            else:
-                all_bools.append(False)
-        return any(all_bools)
 
+    """
+        DELETES FUNCTIONS
+    """
 
     @concurrent.thread
     def _concurrent_delete_list(self, key):
@@ -232,9 +198,24 @@ class Jamboree(EventProcessor):
         
         # Delete while unlocked.
         self._concurrent_delete_list(placeholder_hash_del)
-        
     
+    def _remove_first_redis(self, _hash, query:dict):
+        rlock = f"{_hash}:lock"
+        with self.redis.lock(rlock):
+            push_key = f"{_hash}:list"
+            self.redis.rpop(push_key)
 
+    def remove_first(self, query:dict):
+        _hash = self._generate_hash(query)
+        count = self._get_count(_hash, query)
+
+        if count == 0:
+            return
+
+        self._remove_first_redis(_hash, query)
+    """ 
+        SAVE FUNCTIONS
+    """
 
 
     def save(self, query:dict, data:dict):
@@ -252,6 +233,58 @@ class Jamboree(EventProcessor):
         for item in data:
             self._save(query, item)
     
+
+
+    def _bulk_save(self, query, data:list):
+        
+
+        """ Bulk adds a list to redis."""
+        if self._validate_query(query) == False or len(data) == 0:
+            # Log a warning here instead
+            return
+
+        updated_list = [self._update_dict_query(query, x) for x in data]
+        _hash = self._generate_hash(query)
+        self._bulk_save_redis(_hash, updated_list)
+        self._bulk_save_mongo(query, updated_list)
+    
+
+
+    def _save_redis(self, _hash:str, data:dict):
+        serialized = orjson.dumps(data)
+        rlock = f"{_hash}:lock"
+        with self.redis.lock(rlock):
+            push_key = f"{_hash}:list"
+            self.redis.rpush(push_key, serialized)
+    
+    def _bulk_save_redis(self, _hash:str, data:list):
+
+        serialized_list = [orjson.dumps(x) for x in data]
+        rlock = f"{_hash}:lock"
+        with self.redis.lock(rlock):
+            push_key = f"{_hash}:list"
+            self.redis.rpush(push_key, *serialized_list)
+    
+
+    @concurrent.thread
+    def _bulk_save_mongo(self, query:dict, data:list):
+        if len(data) == 0:
+            return
+
+        self.store.bulk_upsert(data, _column_first=query.keys(), _in=['timestamp'])
+
+
+    @concurrent.thread
+    def _save_mongo(self, data):
+        self.store.store(data)
+
+
+
+    """
+        Public Query Functions
+    """
+
+
     def query_direct(self, query):
         """ Queries from mongodb directly. Used to search extremely large queries. """
         latest_items = list(self.store.query_latest(query))
@@ -300,7 +333,39 @@ class Jamboree(EventProcessor):
             return latest_items
         
         return latest_redis_items
-        
+    
+    """
+        SEARCH ONE FUNCTIONS
+    """
+
+
+    def _search_one(self, item:dict, query:dict):
+        all_bools = []
+        for q in query:
+            if q in item:
+                if query[q] == query[q]:
+                    all_bools.append(True)
+                else:
+                    all_bools.append(False)
+            else:
+                all_bools.append(False)
+        return any(all_bools)
+
+
+
+    def _get_count(self, _hash:str, query:dict):
+        # Checks to see if a count already exist in redis, if not, check for a count in mongo.
+        _count_hash = f"{_hash}:list"
+        count = self.redis.llen(_count_hash)
+        if count is not None:
+            return count
+        # Warning slow!!!
+        records = list(self.store.query(query))
+        record_len = len(records)
+        return record_len
+
+
+
     def count(self, query):
         """ """
         if self._validate_query(query) == False:
@@ -310,13 +375,15 @@ class Jamboree(EventProcessor):
         _hash = self._generate_hash(query)
         count = self._get_count(_hash, query)
         return count
-    
+
+
+
     def _bulk_save(self, query, data:list):
         """ Bulk adds a list to redis."""
         if self._validate_query(query) == False:
             # Log a warning here instead
             return
         _hash = self._generate_hash(query)
-        self._bulk_save_redis(_hash, query, data)
+        self._bulk_save_redis(_hash, data)
         self._bulk_save_mongo(query, data)
     
