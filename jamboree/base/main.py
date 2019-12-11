@@ -9,7 +9,7 @@ from funtime import Store
 from pebble.pool import ThreadPool
 import base64
 from multiprocessing import cpu_count
-from crayons import green
+from crayons import green, yellow
 from loguru import logger
 class EventProcessor(ABC):
     def save(self, query:dict, data:dict):
@@ -460,16 +460,21 @@ class Jamboree(EventProcessor):
                     pipe.watch(push_key)
                     pipe.watch(swap_key)
                     
+                    
                     abs_limit = abs(limit)
 
-                    latest_items = pipe.lrange(push_key, -abs_limit, -1)
+                    latest_items = pipe.lrange(push_key, -(abs_limit), -1)
                     latest_items_reversed = copy(latest_items)
-                    pipe.ltrim(push_key, 0, -(abs_limit))
+                    pipe.ltrim(push_key, 0, -(abs_limit+1))
                     if len(latest_items) > 0:
-                        if len(latest_items) > 1:
-                            # Sort the items from what you get
-                            latest_items_reversed = list(reversed(latest_items_reversed))
+                        latest_items_reversed = list(reversed(latest_items_reversed))
                         pipe.rpush(swap_key, *latest_items_reversed)
+                    
+                    # count = pipe.llen(push_key)
+                    # swap_count = pipe.llen(swap_key)
+                    # print(green(count))
+                    # print(yellow(swap_count))
+
                     pipe.execute()
                     
                 except Exception as e:
@@ -501,7 +506,6 @@ class Jamboree(EventProcessor):
 
                     pipe.watch(push_key)
                     pipe.watch(swap_key)
-                    
                     main_count = pipe.llen(push_key)
                     swap_count = pipe.llen(swap_key)
                     
