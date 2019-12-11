@@ -434,6 +434,9 @@ class Jamboree(EventProcessor):
                     latest_items = pipe.lrange(push_key, -limit, -1)
                     pipe.ltrim(push_key, 0, -limit)
                     if len(latest_items) > 0:
+                        if len(latest_items) > 1:
+                            # Sort the items from what you get
+                            latest_items = list(reversed(latest_items))
                         pipe.rpush(swap_key, *latest_items)
                     pipe.execute()
                     
