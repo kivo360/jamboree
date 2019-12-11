@@ -1,5 +1,5 @@
 from abc import ABC, ABCMeta
-from typing import Dict, Any
+from typing import Dict, Any, List
 import copy
 from .main import EventProcessor
 
@@ -32,6 +32,13 @@ class BaseHandler(object, metaclass=ABCMeta):
     def save_many(self, query, data):
         raise NotImplementedError
     
+    def pop_multiple(self, query, _limit=1):
+        raise NotImplementedError
+
+    def swap(self, query, alt={}):
+        """ Swap betwen the first and last item """
+        raise NotImplementedError
+
 class DBHandler(BaseHandler):
     """ 
         A way to handle reads and writes consistently without having to write every single variable:
@@ -173,6 +180,12 @@ class DBHandler(BaseHandler):
         query.update(alt)
         self.event_proc.remove_first(query)
 
+    def pop_many(self, _limit, alt={}):
+        query = copy.copy(self._query)
+        query['type'] = self.entity
+        query.update(alt)
+        return self.event_proc.pop_multiple(query, _limit)
+
     def count(self, alt={}):
         """ Aims to get many variables """
         self.check()
@@ -180,3 +193,10 @@ class DBHandler(BaseHandler):
         query['type'] = self.entity
         query.update(alt)
         return self.event_proc.count(query)
+    
+    def swap_many(self, limit:int=10, alt={}):
+        self.check()
+        query = copy.copy(self._query)
+        query['type'] = self.entity
+        query.update(alt)
+        return self.event_proc.multi_swap(query, limit)

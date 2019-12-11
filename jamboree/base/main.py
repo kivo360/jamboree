@@ -27,6 +27,16 @@ class EventProcessor(ABC):
     
     def remove_first(self, query:dict):
         raise NotImplementedError
+    
+
+    def pop_multiple(self, query:dict, limit:int):
+        raise NotImplementedError
+
+    def _bulk_save(self, query:dict):
+        raise NotImplementedError
+
+    def multi_swap(self, query:dict, limit:int=10):
+        raise NotImplementedError
 
 class Jamboree(EventProcessor):
     """Adds and retrieves events at extremely fast speeds. Use to handle portfolio and trade information quickly."""
@@ -272,6 +282,36 @@ class Jamboree(EventProcessor):
         self.store.store(data)
 
 
+    def _pop_redis_multiple(self, _hash, limit:int):
+        rlock = f"{_hash}:lock"
+        with self.redis.lock(rlock):
+            with self.redis.pipeline() as pipe:
+                latest_items = []
+                try:
+                    push_key = f"{_hash}:list"  
+                    pipe.watch(push_key)
+                    latest_items = pipe.lrange(push_key, -limit, -1)
+                    pipe.ltrim(push_key, 0, -limit)
+                    pipe.execute()
+                    
+                except Exception as e:
+                    pass
+                finally:
+                    pipe.reset()
+                if len(latest_items) > 0:
+                    return self.back_to_dict(latest_items)
+                return latest_items
+
+
+    def pop_multiple(self, query, limit:int=1):
+        """ Get multiple items """
+        _hash = self._generate_hash(query)
+        count = self._get_count(_hash, query)
+        if count == 0:
+            return []
+        return self._pop_redis_multiple(_hash, limit)
+
+
 
     """
         Public Query Functions
@@ -315,6 +355,7 @@ class Jamboree(EventProcessor):
         if count == 0:
             return []
         
+
         latest_redis_items = self.back_to_dict(self.redis.lrange(f"{_hash}:list", -limit, -1))
         # TODO: Get mongo tasks here
         # How will this work now?
@@ -380,3 +421,34 @@ class Jamboree(EventProcessor):
         self._bulk_save_redis(_hash, data)
         self.pool.schedule(self._bulk_save_mongo, args=(query, data))
     
+
+    def _multi_swap(self, _hash:str, limit=100):
+        rlock = f"{_hash}:lock"
+        with self.redis.lock(rlock):
+            with self.redis.pipeline() as pipe:
+                latest_items = []
+                try:
+                    push_key = f"{_hash}:list"
+                    swap_key = f"{_hash}:swap"  
+                    pipe.watch(push_key)
+                    latest_items = pipe.lrange(push_key, -limit, -1)
+                    pipe.ltrim(push_key, 0, -limit)
+                    if len(latest_items) > 0:
+                        pipe.rpush(swap_key, *latest_items)
+                    pipe.execute()
+                    
+                except Exception as e:
+                    pass
+                finally:
+                    pipe.reset()
+                if len(latest_items) > 0:
+                    return self.back_to_dict(latest_items)
+                return latest_items
+
+
+    def multi_swap(self, query:dict, limit=100):
+        if self._validate_query(query) == False: return []
+        _hash = self._generate_hash(query)
+        count = self._get_count(_hash, query)
+        if count == 0: return
+        return self._multi_swap(_hash, limit=limit)

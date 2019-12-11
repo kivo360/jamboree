@@ -44,8 +44,12 @@ class SampleEnvHandler(DBHandler):
         self._limit = limit 
 
     @property
+    def count(self):
+        return super().count()
+
+    @property
     def balance(self):
-        """ Gets the sum of the last three values at set the value """
+        """ Gets the sum of the last three pop_multiplevalues at set the value """
         return self._balance
 
     @property
@@ -71,6 +75,9 @@ class SampleEnvHandler(DBHandler):
         new_value = data['value'] + count
         data['value'] = int(new_value)
         super().save(data)
+    
+    def pop_many(self, _limit:int=1, alt:dict={}):
+        return super().pop_many(_limit, alt)
 
     
 
@@ -89,10 +96,12 @@ def main():
         for _ in range(1000):
             v1 = randint(0, 12)      
             sample_env_handler.save({"value": v1})
-            if flip(0.05):
-                sample_env_handler.save_update_recent({"value": v1})
+
+        swap = sample_env_handler.swap_many(limit=300)
+        print(swap)
+        # print(len(sample_env_handler.pop_many(1050)))
         
-        # print(sample_env_handler.last())
-        # print(sample_env_handler.transactions)
+
+
 if __name__ == "__main__":
     main()
