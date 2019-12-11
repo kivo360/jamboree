@@ -113,8 +113,8 @@ def main():
         
         times_arr = np.array(times)
         times_mixed_arr = np.array(times_mixed)
+        
         # IT WORKS!!!!!
-
         print(np.diff(times_arr))
         print(np.diff(times_mixed_arr))
         

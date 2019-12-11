@@ -396,7 +396,6 @@ class Jamboree(EventProcessor):
             with self.redis.pipeline() as pipe:
                 latest_items = []
                 try:
-                    push_key = f"{_hash}:list"
                     swap_key = f"{_hash}:swap"  
                     pipe.watch(swap_key)
                     
@@ -465,7 +464,7 @@ class Jamboree(EventProcessor):
 
                     latest_items = pipe.lrange(push_key, -abs_limit, -1)
                     latest_items_reversed = copy(latest_items)
-                    pipe.ltrim(push_key, 0, -(abs_limit+1))
+                    pipe.ltrim(push_key, 0, -(abs_limit))
                     if len(latest_items) > 0:
                         if len(latest_items) > 1:
                             # Sort the items from what you get
