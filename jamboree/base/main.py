@@ -1,4 +1,5 @@
 from abc import ABC
+from copy import copy
 import maya
 import orjson
 import ujson
@@ -8,7 +9,8 @@ from funtime import Store
 from pebble.pool import ThreadPool
 import base64
 from multiprocessing import cpu_count
-
+from crayons import green
+from loguru import logger
 class EventProcessor(ABC):
     def save(self, query:dict, data:dict):
         raise NotImplementedError
@@ -32,10 +34,16 @@ class EventProcessor(ABC):
     def pop_multiple(self, query:dict, limit:int):
         raise NotImplementedError
 
-    def _bulk_save(self, query:dict):
+    def _bulk_save(self, query:dict, data:list):
         raise NotImplementedError
 
-    def multi_swap(self, query:dict, limit:int=10):
+    def multi_swap(self, query:dict, limit:int=100):
+        raise NotImplementedError
+    
+    def query_mix(self, query:dict, limit:int=100):
+        raise NotImplementedError
+
+    def get_latest_many_swap(self, query:dict, limit:int):
         raise NotImplementedError
 
 class Jamboree(EventProcessor):
@@ -249,7 +257,7 @@ class Jamboree(EventProcessor):
 
         updated_list = [self._update_dict(query, x) for x in data]
         _hash = self._generate_hash(query)
-        # self._bulk_save_redis(_hash, updated_list)
+        
         self.pool.schedule(self._bulk_save_redis, args=(_hash, updated_list))
         self.pool.schedule(self._bulk_save_mongo, args=(query, updated_list))
     
@@ -346,14 +354,10 @@ class Jamboree(EventProcessor):
 
     def get_latest_many(self, query:dict, limit=1000):
 
-        if self._validate_query(query) == False:
-            # Log a warning here instead
-            return []
-        
+        if self._validate_query(query) == False: return []
         _hash = self._generate_hash(query)
         count = self._get_count(_hash, query)
-        if count == 0:
-            return []
+        if count == 0: return []
         
 
         latest_redis_items = self.back_to_dict(self.redis.lrange(f"{_hash}:list", -limit, -1))
@@ -386,6 +390,36 @@ class Jamboree(EventProcessor):
         return any(all_bools)
 
 
+    def _latest_many_swap(self, _hash:str, limit:int=10):
+        rlock = f"{_hash}:lock"
+        with self.redis.lock(rlock):
+            with self.redis.pipeline() as pipe:
+                latest_items = []
+                try:
+                    push_key = f"{_hash}:list"
+                    swap_key = f"{_hash}:swap"  
+                    pipe.watch(swap_key)
+                    
+                    abs_limit = abs(limit)
+
+                    latest_items = pipe.lrange(swap_key, -abs_limit, -1)
+                    latest_items = list(reversed(latest_items))
+                    pipe.execute()
+                except Exception as e:
+                    logger.error(str(e))
+                finally:
+                    pipe.reset()
+                if len(latest_items) > 0:
+                    return self.back_to_dict(latest_items)
+                return latest_items
+
+    def get_latest_many_swap(self, query:dict, _limit:int):
+        if self._validate_query(query) == False: return []
+        _hash = self._generate_hash(query)
+        count = self._get_count(_hash, query)
+        if count == 0: return []
+        return self._latest_many_swap(_hash, _limit)
+
 
     def _get_count(self, _hash:str, query:dict):
         # Checks to see if a count already exist in redis, if not, check for a count in mongo.
@@ -399,13 +433,9 @@ class Jamboree(EventProcessor):
         return record_len
 
 
-
     def count(self, query):
         """ """
-        if self._validate_query(query) == False:
-            # Log a warning here instead
-            return []
-        
+        if self._validate_query(query) == False: return []
         _hash = self._generate_hash(query)
         count = self._get_count(_hash, query)
         return count
@@ -414,9 +444,7 @@ class Jamboree(EventProcessor):
 
     def _bulk_save(self, query, data:list):
         """ Bulk adds a list to redis."""
-        if self._validate_query(query) == False:
-            # Log a warning here instead
-            return
+        if self._validate_query(query) == False: return
         _hash = self._generate_hash(query)
         self._bulk_save_redis(_hash, data)
         self.pool.schedule(self._bulk_save_mongo, args=(query, data))
@@ -431,13 +459,18 @@ class Jamboree(EventProcessor):
                     push_key = f"{_hash}:list"
                     swap_key = f"{_hash}:swap"  
                     pipe.watch(push_key)
-                    latest_items = pipe.lrange(push_key, -limit, -1)
-                    pipe.ltrim(push_key, 0, -limit)
+                    pipe.watch(swap_key)
+                    
+                    abs_limit = abs(limit)
+
+                    latest_items = pipe.lrange(push_key, -abs_limit, -1)
+                    latest_items_reversed = copy(latest_items)
+                    pipe.ltrim(push_key, 0, -(abs_limit+1))
                     if len(latest_items) > 0:
                         if len(latest_items) > 1:
                             # Sort the items from what you get
-                            latest_items = list(reversed(latest_items))
-                        pipe.rpush(swap_key, *latest_items)
+                            latest_items_reversed = list(reversed(latest_items_reversed))
+                        pipe.rpush(swap_key, *latest_items_reversed)
                     pipe.execute()
                     
                 except Exception as e:
@@ -455,3 +488,66 @@ class Jamboree(EventProcessor):
         count = self._get_count(_hash, query)
         if count == 0: return
         return self._multi_swap(_hash, limit=limit)
+
+
+    def _query_mix(self, _hash:str, limit:int=10) -> List:
+        """ Actually do the redis operation here. """
+        rlock = f"{_hash}:lock"
+        with self.redis.lock(rlock):
+            with self.redis.pipeline() as pipe:
+                latest_items = []
+                try:
+                    push_key = f"{_hash}:list"
+                    swap_key = f"{_hash}:swap"  
+
+                    pipe.watch(push_key)
+                    pipe.watch(swap_key)
+                    
+                    main_count = pipe.llen(push_key)
+                    swap_count = pipe.llen(swap_key)
+                    
+                    if main_count == 0 and swap_count == 0: raise AttributeError("Skip further queries")
+
+
+                    # Determine the amount we're going to get from the main search
+                    limit_swap_diff = limit - swap_count
+                    
+                    main_req = 0
+                    swap_req = 0
+                    
+                    # ----------------------------------------------------------
+                    # -------------- Get the query requirements ----------------
+                    # ----------------------------------------------------------
+
+                    if limit_swap_diff < 0:
+                        swap_req = limit
+                    elif limit_swap_diff >= 1:
+                        swap_req = swap_count
+                        main_req = limit_swap_diff
+                    
+                    main_latest_items = []
+                    if main_req != 0:
+                        main_latest_items = pipe.lrange(push_key, -main_req, -1)
+                    
+                    swap_latest_items = list(reversed(pipe.lrange(swap_key, -swap_req, -1)))
+
+                    latest_items = main_latest_items + swap_latest_items
+                    # means the count of the swapped elements is less than the total limit, yet isn't empty
+                    pipe.execute()
+                    
+                except Exception as e:
+                    logger.error(str(e))
+                finally:
+                    pipe.reset()
+                if len(latest_items) > 0:
+                    return self.back_to_dict(latest_items)
+                return latest_items
+
+    def query_mix(self, query:dict, limit=100) -> List:
+        """ Get information from both the `:swap` and real list. Empty list for now. """
+        if self._validate_query(query) == False: return []
+        _hash = self._generate_hash(query)
+        count = self._get_count(_hash, query)
+        if count == 0: return []
+        print(green("Querying from both :swap and :list", bold=True))
+        return self._query_mix(_hash, limit=limit)

@@ -2,11 +2,16 @@ import time
 import vaex
 import uuid
 import pandas as pd
+import numpy as np
 import maya
 from jamboree import Jamboree, DBHandler
 import random
 from random import randint
 from contextlib import ContextDecorator
+from pprint import pprint
+from crayons import blue
+from toolz.itertoolz import pluck
+
 class timecontext(ContextDecorator):
     def __enter__(self):
         self.start = maya.now()._epoch
@@ -93,13 +98,25 @@ def main():
     sample_env_handler.event = jambo
     sample_env_handler['episode'] = uuid.uuid1().hex
     with timecontext():
+        current_time = time.time()
+        mult = 60
         for _ in range(1000):
             v1 = randint(0, 12)      
-            sample_env_handler.save({"value": v1})
+            sample_env_handler.save({"value": v1, "time": (current_time + (mult * _))})
 
-        swap = sample_env_handler.swap_many(limit=300)
-        print(swap)
-        # print(len(sample_env_handler.pop_many(1050)))
+        sample_env_handler.swap_many(limit=5)
+        swap_only = sample_env_handler.query_many_swap(limit=20)
+        query_mixed = sample_env_handler.query_mix(limit=20)
+        times = list(pluck("time", swap_only))
+        times_mixed = list(pluck("time", query_mixed))
+        
+        
+        times_arr = np.array(times)
+        times_mixed_arr = np.array(times_mixed)
+        # IT WORKS!!!!!
+
+        print(np.diff(times_arr))
+        print(np.diff(times_mixed_arr))
         
 
 

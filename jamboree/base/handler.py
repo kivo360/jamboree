@@ -18,25 +18,30 @@ class BaseHandler(object, metaclass=ABCMeta):
     
     def save(self, data:dict):
         raise NotImplementedError
-    
+
+    def _bulk_save(self, query:dict, data:list):
+        raise NotImplementedError
+
     def _get_many(self):
         raise NotImplementedError
 
-    
     def last(self):
         raise NotImplementedError
 
-    def many(self, limit=100):
+    def many(self, limit:int=100):
         raise NotImplementedError
     
-    def save_many(self, query, data):
+    def save_many(self, query:dict, data:list):
         raise NotImplementedError
     
-    def pop_multiple(self, query, _limit=1):
+    def pop_multiple(self, query, _limit:int=1):
         raise NotImplementedError
 
-    def swap(self, query, alt={}):
+    def swap(self, query, alt:dict={}):
         """ Swap betwen the first and last item """
+        raise NotImplementedError
+    
+    def query_mix(self, query:dict, alt:dict={}):
         raise NotImplementedError
 
 class DBHandler(BaseHandler):
@@ -195,8 +200,24 @@ class DBHandler(BaseHandler):
         return self.event_proc.count(query)
     
     def swap_many(self, limit:int=10, alt={}):
+        """ Move items from the main list to a swapped list. """
         self.check()
         query = copy.copy(self._query)
         query['type'] = self.entity
         query.update(alt)
         return self.event_proc.multi_swap(query, limit)
+
+    
+    def query_mix(self, limit:int=10, alt:dict={}):
+        self.check()
+        query = copy.copy(self._query)
+        query['type'] = self.entity
+        query.update(alt)
+        return self.event_proc.query_mix(query, limit)
+    
+    def query_many_swap(self, limit:int=10, alt:dict={}):
+        self.check()
+        query = copy.copy(self._query)
+        query['type'] = self.entity
+        query.update(alt)
+        return self.event_proc.get_latest_many_swap(query, limit)
