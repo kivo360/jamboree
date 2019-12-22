@@ -11,6 +11,7 @@ import base64
 from multiprocessing import cpu_count
 from crayons import green, yellow
 from loguru import logger
+import random
 class EventProcessor(ABC):
     def save(self, query:dict, data:dict):
         raise NotImplementedError
@@ -67,7 +68,6 @@ class Jamboree(EventProcessor):
         _hash = ujson.dumps(query, sort_keys=True)
         _hash = base64.b64encode(str.encode(_hash))
         _hash = _hash.decode('utf-8')
-        # print(_hash)
         return _hash
 
     def _check_redis_for_prior(self, _hash:str) -> bool:
@@ -79,6 +79,7 @@ class Jamboree(EventProcessor):
 
 
     def _update_dict(self, query:dict, data:dict):
+        query = copy(query)
         timestamp = maya.now()._epoch
         query['timestamp'] = timestamp
         data.update(query)
@@ -155,7 +156,6 @@ class Jamboree(EventProcessor):
             # Log a warning here instead
             return
         self.pool.schedule(self._reset_count, args=(query))
-        # self._reset_count(query)
     
 
     """
@@ -248,8 +248,6 @@ class Jamboree(EventProcessor):
 
 
     def _bulk_save(self, query, data:list):
-        
-
         """ Bulk adds a list to redis."""
         if self._validate_query(query) == False or len(data) == 0:
             # Log a warning here instead
@@ -258,8 +256,10 @@ class Jamboree(EventProcessor):
         updated_list = [self._update_dict(query, x) for x in data]
         _hash = self._generate_hash(query)
         
-        self.pool.schedule(self._bulk_save_redis, args=(_hash, updated_list))
+        logger.info(query)
+        self._bulk_save_redis(_hash, updated_list)
         self.pool.schedule(self._bulk_save_mongo, args=(query, updated_list))
+        # self.pool.schedule(self._bulk_save_redis, args=(_hash, updated_list))
     
 
 
@@ -271,8 +271,8 @@ class Jamboree(EventProcessor):
             self.redis.rpush(push_key, serialized)
     
     def _bulk_save_redis(self, _hash:str, data:list):
-
         serialized_list = [orjson.dumps(x) for x in data]
+        
         rlock = f"{_hash}:lock"
         with self.redis.lock(rlock):
             push_key = f"{_hash}:list"
@@ -441,12 +441,12 @@ class Jamboree(EventProcessor):
 
 
 
-    def _bulk_save(self, query, data:list):
-        """ Bulk adds a list to redis."""
-        if self._validate_query(query) == False: return
-        _hash = self._generate_hash(query)
-        self._bulk_save_redis(_hash, data)
-        self.pool.schedule(self._bulk_save_mongo, args=(query, data))
+    # def _bulk_save(self, query, data:list):
+    #     """ Bulk adds a list to redis."""
+    #     if self._validate_query(query) == False: return
+    #     _hash = self._generate_hash(query)
+    #     self._bulk_save_redis(_hash, data)
+    #     self.pool.schedule(self._bulk_save_mongo, args=(query, data))
     
 
     def _multi_swap(self, _hash:str, limit=100):
@@ -478,7 +478,7 @@ class Jamboree(EventProcessor):
                     pipe.execute()
                     
                 except Exception as e:
-                    pass
+                    logger.info(str(e))
                 finally:
                     pipe.reset()
                 if len(latest_items) > 0:

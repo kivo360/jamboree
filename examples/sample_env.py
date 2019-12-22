@@ -11,7 +11,8 @@ from contextlib import ContextDecorator
 from pprint import pprint
 from crayons import blue
 from toolz.itertoolz import pluck
-
+from copy import copy
+from loguru import logger
 class timecontext(ContextDecorator):
     def __enter__(self):
         self.start = maya.now()._epoch
@@ -39,6 +40,7 @@ class SampleEnvHandler(DBHandler):
         }
         self._balance = 0
         self._limit = 100
+        self['opt_type'] = "live"
 
     @property
     def limit(self):
@@ -83,7 +85,45 @@ class SampleEnvHandler(DBHandler):
     
     def pop_many(self, _limit:int=1, alt:dict={}):
         return super().pop_many(_limit, alt)
+    
 
+    def load_to_backtest(self, alt:dict={}):
+        # Get the current record first
+
+        current_backtest = self.copy()
+        current_backtest['opt_type'] = "backtest"
+        current_backtest['episode'] = uuid.uuid4().hex
+        logger.info(self['episode'])
+        logger.info(current_backtest['episode'])
+
+        last_1000 = self.many(limit=self.limit)
+
+        # logger.info(last_1000)
+
+
+        current_backtest.save_many(last_1000)
+        swapped = current_backtest.swap_many(limit=5)
+        logger.info(swapped)
+        # last_1000_2 = current_backtest.many(limit=self.limit)
+        # logger.info(current_backtest.data)
+        # logger.info(current_backtest.required)
+
+        # print()
+        # logger.info(self.required)
+        # current_count = self.count
+        # print(current_count)
+        
+    
+
+
+    def copy(self):
+        new_sample = SampleEnvHandler()
+        new_sample.data = copy(self.data)
+        new_sample.required = copy(self.required)
+        new_sample._required = copy(self._required)
+        new_sample.limit = copy(self.limit)
+        new_sample.event_proc = self.event_proc
+        return new_sample
     
 
 def flip(n=0.02):
@@ -117,7 +157,18 @@ def main():
         # IT WORKS!!!!!
         print(np.diff(times_arr))
         print(np.diff(times_mixed_arr))
-        
+    
+    
+    # Create a new set of records and swap to another location to be acted on.
+    sample_env_handler['episode'] = uuid.uuid1().hex
+    with timecontext():
+        for _ in range(1000):
+            v1 = randint(0, 12)
+            sample_env_handler.save({"value": v1, "time": (current_time + (mult * _))})
+
+        print("Save one data type")
+        print("Load another data type into it's own bucket")
+        sample_env_handler.load_to_backtest()
 
 
 if __name__ == "__main__":

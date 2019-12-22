@@ -1,7 +1,10 @@
 from abc import ABC, ABCMeta
 from typing import Dict, Any, List
 import copy
+
+from loguru import logger
 from .main import EventProcessor
+from crayons import red
 
 
 class BaseHandler(object, metaclass=ABCMeta):
@@ -134,7 +137,6 @@ class DBHandler(BaseHandler):
                 raise AttributeError(f"{req} is not a {_type}")
         return True
     
-    
 
     def save(self, data:dict, alt={}):
         self.check()
@@ -142,6 +144,7 @@ class DBHandler(BaseHandler):
         query = copy.copy(self._query)
         query['type'] = self.entity
         query.update(alt)
+        query.update(self.data)
         self.event_proc.save(query, data)
     
 
@@ -150,7 +153,9 @@ class DBHandler(BaseHandler):
 
         query = copy.copy(self._query)
         query['type'] = self.entity
+        # logger.info(query)
         query.update(alt)
+        query.update(self.data)
         self.event_proc._bulk_save(query, data)
     
 
@@ -160,35 +165,42 @@ class DBHandler(BaseHandler):
         query = copy.copy(self._query)
         query['type'] = self.entity
         query.update(alt)
+        query.update(self.data)
         latest_many = self.event_proc.get_latest_many(query, limit=limit)
         return latest_many
-    
+
+
     def _get_latest(self, alt={}):
         self.check()
         query = copy.copy(self._query)
         query['type'] = self.entity
         query.update(alt)
+        query.update(self.data)
         latest = self.event_proc.get_latest(query)
         return latest
 
 
     def last(self, alt={}):
+        alt.update(self.data)
         return self._get_latest(alt)
 
 
     def many(self, limit=1000, alt={}):
+        alt.update(self.data)
         return self._get_many(limit, alt=alt)
 
     def pop(self, alt={}):
         query = copy.copy(self._query)
         query['type'] = self.entity
         query.update(alt)
+        query.update(self.data)
         self.event_proc.remove_first(query)
 
     def pop_many(self, _limit, alt={}):
         query = copy.copy(self._query)
         query['type'] = self.entity
         query.update(alt)
+        query.update(self.data)
         return self.event_proc.pop_multiple(query, _limit)
 
     def count(self, alt={}):
@@ -197,6 +209,7 @@ class DBHandler(BaseHandler):
         query = copy.copy(self._query)
         query['type'] = self.entity
         query.update(alt)
+        query.update(self.data)
         return self.event_proc.count(query)
     
     def swap_many(self, limit:int=10, alt={}):
@@ -205,6 +218,7 @@ class DBHandler(BaseHandler):
         query = copy.copy(self._query)
         query['type'] = self.entity
         query.update(alt)
+        query.update(self.data)
         return self.event_proc.multi_swap(query, limit)
 
     
@@ -213,6 +227,7 @@ class DBHandler(BaseHandler):
         query = copy.copy(self._query)
         query['type'] = self.entity
         query.update(alt)
+        query.update(self.data)
         return self.event_proc.query_mix(query, limit)
     
     def query_many_swap(self, limit:int=10, alt:dict={}):
@@ -220,4 +235,5 @@ class DBHandler(BaseHandler):
         query = copy.copy(self._query)
         query['type'] = self.entity
         query.update(alt)
+        query.update(self.data)
         return self.event_proc.get_latest_many_swap(query, limit)
