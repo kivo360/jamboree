@@ -193,22 +193,6 @@ def flip(n=0.02):
         return True
     return False
 
-def main():
-    jambo = Jamboree()
-    sample_env_handler = SampleEnvHandler()
-    sample_env_handler.limit = 250
-    sample_env_handler.event = jambo
-    sample_env_handler['episode'] = uuid.uuid1().hex
-    with timecontext():
-        for i in range(1000):
-            v1 = randint(0, 12)      
-            sample_env_handler.save({"value": v1})
-            if flip(0.05):
-                sample_env_handler.save_update_recent({"value": v1})
-        
-        print(sample_env_handler.last())
-        print(sample_env_handler.transactions)
-
 if __name__ == "__main__":
     main()
 ```

@@ -12,6 +12,9 @@ from multiprocessing import cpu_count
 from crayons import green, yellow
 from loguru import logger
 import random
+from jamboree.storage.databases import MongoDatabaseConnection, RedisDatabaseConnection
+
+
 class EventProcessor(ABC):
     def save(self, query:dict, data:dict):
         raise NotImplementedError
@@ -53,6 +56,12 @@ class Jamboree(EventProcessor):
         self.redis = Redis(redis_host, port=redis_port)
         self.store = Store(mongodb_host).create_lib('events').get_store()['events']
         self.pool = ThreadPool(max_workers=cpu_count()*4)
+        self.mongo_conn = MongoDatabaseConnection()
+        self.redis_conn = RedisDatabaseConnection()
+        self.mongo_conn.connection = self.store
+        self.redis_conn.connection = self.redis
+        # self.redis_conn.pool = self.pool
+        # self.mongo_conn.pool = self.pool
     
     def _validate_query(self, query:dict):
         """ Validates a query. Must have `type` and a second identifier at least"""
@@ -119,17 +128,8 @@ class Jamboree(EventProcessor):
             Does it in a background process. Use with add event.
             We save the information both in mongodb and redis. We assume there's many of each collection. We find a specific collection using the query.
         """
-        if self._validate_query(query) == False:
-            # Log a warning here instead
-            return
-        timestamp=maya.now()._epoch
-        _hash = self._generate_hash(query)
-        # Now time to update the system
-        query.update(data)
-        query['timestamp'] = timestamp
-        
-        self._save_redis(_hash, query)
-        self.pool.schedule(self._save_mongo, args=(query))
+        self.redis_conn.save(query, data)
+        self.pool.schedule(self.mongo_conn.save, args=(query, data))
 
 
     """
@@ -138,35 +138,13 @@ class Jamboree(EventProcessor):
 
     def _reset_count(self, query:dict):
         """ Reset the count for the current mongodb query. We do this by adding records in mongo back into redis. """
-        _hash = self._generate_hash(query)
-        phindex = self.redis.incr("placeholder:index")
-        delindex = self.redis.incr("deletion:index")
-        _hash_key = f"{_hash}:list" 
-        _hash_placeholder = f"{_hash}:{phindex}"
-        _hash_del = f"{_hash}:{delindex}"
-
-
-        # self.redis.rename(_hash_key, _hash_rename)
-        mongo_data = list(self.store.query(query))
-        rlock = f"{_hash}:lock"
-        with self.redis.lock(rlock):
-            # placeholder key
-            for md in mongo_data:
-                self.redis.rpush(_hash_placeholder, orjson.dumps(md))
-
-            self.redis.rename(_hash_key, _hash_del)
-            self.redis.rename(_hash_placeholder, _hash_key)
-        
-        
-        self._concurrent_delete_list(_hash_del)
+        all_elements = self.mongo_conn.query_all(query)
+        self.pool.schedule(self.redis_conn.reset, args=(query, all_elements))
 
 
 
     def reset(self, query:dict):
         """ Resets all of the variables """
-        if self._validate_query(query) == False:
-            # Log a warning here instead
-            return
         self.pool.schedule(self._reset_count, args=(query))
     
 
@@ -174,15 +152,7 @@ class Jamboree(EventProcessor):
         DELETES FUNCTIONS
     """
 
-    def _concurrent_delete_list(self, key):
-        while self.redis.llen(key) > 0:
-            self.redis.ltrim(key, 0, -99)
 
-
-    def _concurrent_delete_many(self, query:dict, details:dict):
-        # combine query and details
-        query.update(details)
-        self.store.delete_many(query)
 
     def _remove(self, query:dict, details:dict):
         """ Use to both remove items from redis and mongo. Add it when you need it."""
@@ -192,36 +162,9 @@ class Jamboree(EventProcessor):
             It's a heavy computation on redis, as it'll require searching an entire list.
             
         """
-        # Deletes from mongo concurrently
-        self.pool.schedule(self._concurrent_delete_many, args=(query, details))
-        _hash = self._generate_hash(query)
-        count = self._get_count(_hash, query)
-        phindex = self.redis.incr("placeholder_del:index")
-        placeholder_hash = f"{_hash}:placeholder:{phindex}"
-        placeholder_hash_del = f"{_hash}:placeholder_del:{phindex}"
-        push_key = f"{_hash}:list"
-        rlock = f"{_hash}:lock"
-        
-        with self.redis.lock(rlock):
-            all_matching_redis_items = self.back_to_dict(self.redis.lrange(push_key, 0, -1))
-            if isinstance(all_matching_redis_items, dict):
-                """ Remove replace the current list with the empty one"""
-                is_true = self._search_one(all_matching_redis_items, details)
-                if is_true == False: return
-                self.redis.rpush(placeholder_hash, orjson.dumps(all_matching_redis_items))
-            else:
-                for match in all_matching_redis_items:
-                    is_true = self._search_one(match, details)
-                    if is_true:
-                        self.redis.rpush(placeholder_hash, orjson.dumps(match))
-
-
-            self.redis.rename(push_key, placeholder_hash_del)
-            self.redis.rename(placeholder_hash, push_key)
-        
-        self.pool.schedule(self._concurrent_delete_list, args=(placeholder_hash_del))
-        # Delete while unlocked.
-        # self._concurrent_delete_list(placeholder_hash_del)
+        self.pool.schedule(self.mongo_conn.delete_all, args=(query, details))        
+        self.redis_conn.delete(query, details)
+        self.pool.schedule(self.redis_conn.delete_all, args=(query))
     
     def _remove_first_redis(self, _hash, query:dict):
         rlock = f"{_hash}:lock"
@@ -259,32 +202,16 @@ class Jamboree(EventProcessor):
     
     def _bulk_upsert_redis(self, query, data):
         logger.info("Default retcon redis")
-        if self._validate_query(query) == False or len(data) == 0:
-            # Log a warning here instead
-            return {}
-        updated_list_no_timestamp  = [self._update_dict_no_timestamp(query, x) for x in data]
-
-        _hash = self._generate_hash(query)
-        return {
-            "hash": _hash,
-            "updated": updated_list_no_timestamp
-        }
+        self.pool.schedule(self.redis_conn.update_many, args=(query, data))
 
     def bulk_upsert_redis(self, query, data):
         return self._bulk_upsert_redis(query, data)
 
     def _bulk_save(self, query, data:list):
         """ Bulk adds a list to redis."""
-        if self._validate_query(query) == False or len(data) == 0:
-            # Log a warning here instead
-            return
-
-        updated_list = [self._update_dict(query, x) for x in data]
-        updated_list_no_timestamp  = [self._update_dict_no_timestamp(query, x) for x in data]
-        _hash = self._generate_hash(query)
-
-        self._bulk_save_redis(_hash, updated_list)
-        self.pool.schedule(self._bulk_save_mongo, args=(query, updated_list))
+        
+        self.redis_conn.save_many(query, data)
+        self.pool.schedule(self.mongo_conn.save_many, args=(query, data))
     
 
 
@@ -305,20 +232,6 @@ class Jamboree(EventProcessor):
             push_key = f"{_hash}:list"
             self.redis.rpush(push_key, *serialized_list)
     
-
-    def _bulk_save_mongo(self, query:dict, data:list):
-        if len(data) == 0:
-            return
-        
-        first_item = data[0]
-        first_item.update(query)
-        updated_list = [self._update_dict(query, x) for x in data]
-        self.store.bulk_upsert(updated_list, _column_first=first_item.keys(), _in=['timestamp'])
-
-
-    def _save_mongo(self, data):
-        self.store.store(data)
-
 
     def _pop_redis_multiple(self, _hash, limit:int):
         rlock = f"{_hash}:lock"
@@ -348,7 +261,6 @@ class Jamboree(EventProcessor):
         if count == 0:
             return []
         return self._pop_redis_multiple(_hash, limit)
-
 
 
     """
@@ -514,60 +426,8 @@ class Jamboree(EventProcessor):
 
     def _query_mix(self, _hash:str, limit:int=10) -> List:
         """ Actually do the redis operation here. """
-        rlock = f"{_hash}:lock"
-        with self.redis.lock(rlock):
-            with self.redis.pipeline() as pipe:
-                latest_items = []
-                try:
-                    push_key = f"{_hash}:list"
-                    swap_key = f"{_hash}:swap"  
-
-                    pipe.watch(push_key)
-                    pipe.watch(swap_key)
-                    main_count = pipe.llen(push_key)
-                    swap_count = pipe.llen(swap_key)
-                    
-                    if main_count == 0 and swap_count == 0: raise AttributeError("Skip further queries")
-
-                    # Determine the amount we're going to get from the main search
-                    limit_swap_diff = limit - swap_count
-                    
-                    main_req = 0
-                    swap_req = 0
-                    
-                    # ----------------------------------------------------------
-                    # -------------- Get the query requirements ----------------
-                    # ----------------------------------------------------------
-
-                    if limit_swap_diff < 0:
-                        swap_req = limit
-                    elif limit_swap_diff >= 1:
-                        swap_req = swap_count
-                        main_req = limit_swap_diff
-                    
-                    main_latest_items = []
-                    if main_req != 0:
-                        main_latest_items = pipe.lrange(push_key, -main_req, -1)
-                    
-                    swap_latest_items = list(reversed(pipe.lrange(swap_key, -swap_req, -1)))
-
-                    latest_items = main_latest_items + swap_latest_items
-                    # means the count of the swapped elements is less than the total limit, yet isn't empty
-                    pipe.execute()
-                    
-                except Exception as e:
-                    logger.error(str(e))
-                finally:
-                    pipe.reset()
-                if len(latest_items) > 0:
-                    return self.back_to_dict(latest_items)
-                return latest_items
+        
 
     def query_mix(self, query:dict, limit=100) -> List:
         """ Get information from both the `:swap` and real list. Empty list for now. """
-        if self._validate_query(query) == False: return []
-        _hash = self._generate_hash(query)
-        count = self._get_count(_hash, query)
-        if count == 0: return []
-        print(green("Querying from both :swap and :list", bold=True))
-        return self._query_mix(_hash, limit=limit)
+        return self.redis_conn.query_mix(query, limit)

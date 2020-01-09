@@ -4,12 +4,14 @@ import uuid
 import pandas as pd
 import numpy as np
 import maya
-from jamboree import Jamboree, DBHandler
+from jamboree import DBHandler
+# from jamboree import Jamboree
+from jamboree.base.refactor import Jamboree
 import random
 from random import randint
 from contextlib import ContextDecorator
 from pprint import pprint
-from crayons import blue
+from crayons import blue, red
 from toolz.itertoolz import pluck
 from copy import copy
 from loguru import logger
@@ -101,21 +103,13 @@ class SampleEnvHandler(DBHandler):
 
         last_1000 = self.many(limit=self.limit)
 
-        # logger.info(last_1000)
+        logger.info(len(last_1000))
 
 
         current_backtest.save_many(last_1000)
-        swapped = current_backtest.swap_many(limit=5)
-        logger.info(swapped)
-        # last_1000_2 = current_backtest.many(limit=self.limit)
-        # logger.info(current_backtest.data)
-        # logger.info(current_backtest.required)
-
-        # print()
-        # logger.info(self.required)
-        # current_count = self.count
-        # print(current_count)
-        
+        current_backtest.swap_many(limit=5)
+        swapped = current_backtest.query_mix(limit=5)
+        logger.info(red(swapped))
     
 
 
@@ -140,26 +134,27 @@ def main():
     sample_env_handler.limit = 250
     sample_env_handler.event = jambo
     sample_env_handler['episode'] = uuid.uuid1().hex
-    with timecontext():
-        current_time = time.time()
-        mult = 60
-        for _ in range(1000):
-            v1 = randint(0, 12)      
-            sample_env_handler.save({"value": v1, "time": (current_time + (mult * _))})
+    # with timecontext():
+    current_time = time.time()
+    mult = 60
+    #     for _ in range(1000):
+    #         v1 = randint(0, 12)      
+    #         sample_env_handler.save({"value": v1, "time": (current_time + (mult * _))})
 
-        sample_env_handler.swap_many(limit=5)
-        swap_only = sample_env_handler.query_many_swap(limit=20)
-        query_mixed = sample_env_handler.query_mix(limit=20)
-        times = list(pluck("time", swap_only))
-        times_mixed = list(pluck("time", query_mixed))
+    #     sample_env_handler.swap_many(limit=5)
+    #     swap_only = sample_env_handler.query_many_swap(limit=20)
+    #     query_mixed = sample_env_handler.query_mix(limit=20)
+        
+    #     times = list(pluck("time", swap_only))
+    #     times_mixed = list(pluck("time", query_mixed))
         
         
-        times_arr = np.array(times)
-        times_mixed_arr = np.array(times_mixed)
+    #     times_arr = np.array(times)
+    #     times_mixed_arr = np.array(times_mixed)
         
-        # IT WORKS!!!!!
-        print(np.diff(times_arr))
-        print(np.diff(times_mixed_arr))
+    #     # IT WORKS!!!!!
+    #     print(np.diff(times_arr))
+    #     print(np.diff(times_mixed_arr))
     
     
     # Create a new set of records and swap to another location to be acted on.

@@ -1,20 +1,9 @@
-
-from examples.sample_env import main
-import time
-import vaex
-import uuid
-import pandas as pd
-import numpy as np
 import maya
 from jamboree import Jamboree, DBHandler
 import random
-from random import randint
-from contextlib import ContextDecorator
-from pprint import pprint
-from crayons import blue
-from toolz.itertoolz import pluck
 from copy import copy
 from loguru import logger
+
 
 class UserHandler(DBHandler):
     """Abstract handler that we use to keep track of information.
@@ -50,10 +39,6 @@ class UserHandler(DBHandler):
         self._settings_handler = _settings
         self._settings_handler.limit = self.limit
 
-    @property
-    def balance(self):
-        """ Gets the sum of the last three values at set the value """
-        return self._balance
 
     def is_authenticated(self):
         return True
@@ -143,5 +128,6 @@ def flip(n=0.02):
 
 if __name__ == "__main__":
     user_handler = UserHandler()
-
+    user_handler['user_id'] = "mygeneralemail@gmail.com"
     user_handler.register("password1", "password1", "kevin", "andrew", "hill")
+    user_handler.login("password1")
