@@ -138,6 +138,7 @@ class MongoDatabaseConnection(DatabaseConnection):
     def count(self, query:dict):
         if not self.helpers.validate_query(query):
             return 0
+        query.pop('limit', None)
         records = list(self.connection.query(query))
         record_len = len(records)
         return record_len

@@ -8,7 +8,7 @@ from abc import ABC
 import maya
 import ujson
 import orjson
-
+from typing import List, Set
 
 class Helpers(object):
     def __init__(self) -> None:
@@ -20,6 +20,74 @@ class Helpers(object):
         _hash = _hash.decode('utf-8')
         return _hash
     
+    def add_time(self, item:dict, _time:float, rel_abs="absolute"):
+        if rel_abs == "absolute":
+            item['timestamp'] = _time
+        else:
+            item['time'] = _time
+        return item
+    
+    def generate_dicts(self, data:dict, _time:float, timestamp:float):
+        relative = copy(data)
+        absolute = copy(data)
+        relative['time'] = _time
+        absolute['timestamp'] = _time
+        return {
+            "relative": relative,
+            "absolute": absolute
+        }
+
+    def dictify(self, azset:List[Set], rzset:List[Set]):
+        """Create a dictionary"""
+        if len(azset) == 0 or len(rzset) == 0:
+            return {}
+        adict = {}
+        for azs in azset:
+            item, time = azs
+            current_item = adict.get(item, {})
+            current_item['timestamp'] = time
+            adict[item] = current_item
+            
+        for rzs in rzset:
+            item, time = rzs
+            current_item = adict.get(item, {})
+            current_item['time'] = time
+            adict[item] = current_item
+        
+        return adict
+    
+    def check_time(self, _time:float=None, _timestamp:float=None, local_time:float=None, local_timestamp:float=None):
+        current_time = maya.now()._epoch
+        
+        if local_time is not None:
+            _time = local_time
+        elif _time is None:
+            _time = current_time
+        if local_timestamp is not None:
+            _timestamp = local_timestamp
+        elif _timestamp is None:
+            _timestamp = current_time
+        
+        return {
+            "time": _time,
+            "timestamp": _timestamp
+        }
+
+    def deserialize_dicts(self, dictified:dict):
+        _deserialized = []
+        for key, value in dictified.items():
+            _key = orjson.loads(key)
+            _key['time'] = value.get("time", maya.now()._epoch)
+            _key['timestamp'] = value.get("timestamp", maya.now()._epoch)
+            _deserialized.append(_key)
+        return _deserialized
+
+    def separate_time_data(self, data:dict, _time:float=None, _timestamp:float=None):
+        local_time = data.pop("time", None)
+        local_timestamp = data.pop("timestamp", None)
+        timing = self.check_time(_time, _timestamp, local_time, local_timestamp)
+        return data, timing
+
     def validate_query(self, query:dict):
         """ Validates a query. Must have `type` and a second identifier at least"""
         if 'type' not in query:
