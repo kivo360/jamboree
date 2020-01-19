@@ -17,7 +17,6 @@ from copy import copy
 from loguru import logger
 
 
-
 class timecontext(ContextDecorator):
     def __enter__(self):
         self.start = maya.now()._epoch
@@ -28,8 +27,6 @@ class timecontext(ContextDecorator):
         delta = self.end - self.start
         print(f"It took {delta}ms")
         return False
-
-
 
 
 class SampleEnvHandler(DBHandler):
@@ -50,10 +47,10 @@ class SampleEnvHandler(DBHandler):
     @property
     def limit(self):
         return self._limit
-    
+
     @limit.setter
     def limit(self, limit):
-        self._limit = limit 
+        self._limit = limit
 
     @property
     def count(self):
@@ -65,34 +62,33 @@ class SampleEnvHandler(DBHandler):
         return self._balance
 
     @property
-    def transactions(self)->vaex.dataframe:
+    def transactions(self) -> vaex.dataframe:
         """ Get the last 100 transactions """
         many_records = self.many(self.limit)
-        
+
         if isinstance(many_records, dict):
             frame = pd.DataFrame(many_records)
             transactions_frame = vaex.from_pandas(frame)
             return transactions_frame.sort('timestamp', ascending=False)
-        
+
         if len(many_records) > 0:
             frame = pd.DataFrame(many_records)
             transactions_frame = vaex.from_pandas(frame)
             return transactions_frame.sort('timestamp', ascending=False)
-        
+
         return vaex.from_pandas(pd.DataFrame())
 
-    def save_update_recent(self, data:dict):
+    def save_update_recent(self, data: dict):
         transactions = self.transactions
         count = transactions.count()
         new_value = data['value'] + count
         data['value'] = int(new_value)
         super().save(data)
-    
-    def pop_many(self, _limit:int=1, alt:dict={}):
-        return super().pop_many(_limit, alt)
-    
 
-    def load_to_backtest(self, alt:dict={}):
+    def pop_many(self, _limit: int = 1, alt: dict = {}):
+        return super().pop_many(_limit, alt)
+
+    def load_to_backtest(self, alt: dict = {}):
         # Get the current record first
 
         current_backtest = self.copy()
@@ -105,13 +101,10 @@ class SampleEnvHandler(DBHandler):
 
         logger.info(len(last_1000))
 
-
         current_backtest.save_many(last_1000)
         current_backtest.swap_many(limit=5)
         swapped = current_backtest.query_mix(limit=5)
         logger.info(red(swapped))
-    
-
 
     def copy(self):
         new_sample = SampleEnvHandler()
@@ -121,12 +114,13 @@ class SampleEnvHandler(DBHandler):
         new_sample.limit = copy(self.limit)
         new_sample.event_proc = self.event_proc
         return new_sample
-    
+
 
 def flip(n=0.02):
     if n >= random.uniform(0, 1):
         return True
     return False
+
 
 def main():
     jambo = Jamboree()
@@ -144,19 +138,17 @@ def main():
     #     sample_env_handler.swap_many(limit=5)
     #     swap_only = sample_env_handler.query_many_swap(limit=20)
     #     query_mixed = sample_env_handler.query_mix(limit=20)
-        
+
     #     times = list(pluck("time", swap_only))
     #     times_mixed = list(pluck("time", query_mixed))
-        
-        
+
     #     times_arr = np.array(times)
     #     times_mixed_arr = np.array(times_mixed)
-        
+
     #     # IT WORKS!!!!!
     #     print(np.diff(times_arr))
     #     print(np.diff(times_mixed_arr))
-    
-    
+
     # Create a new set of records and swap to another location to be acted on.
     sample_env_handler['episode'] = uuid.uuid1().hex
     with timecontext():

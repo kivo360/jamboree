@@ -23,37 +23,36 @@ class UserHandler(DBHandler):
     def limit(self):
         """ The maximum number of records we intend to get when calling the many function."""
         return self._limit
-    
+
     @limit.setter
     def limit(self, limit):
-        self._limit = limit 
-    
+        self._limit = limit
+
     @property
     def settings(self):
         if self._settings_handler is None:
             raise AttributeError
         return self._settings_handler
-    
+
     @settings.setter
     def settings(self, _settings):
         self._settings_handler = _settings
         self._settings_handler.limit = self.limit
 
-
     def is_authenticated(self):
         return True
-    
+
     def is_active(self):
         return True
- 
+
     def is_anonymous(self):
         return False
 
-    def _check_password_register(self, password:str, confirm:str):
+    def _check_password_register(self, password: str, confirm: str):
         """ Run through a set of password conditions"""
         return password == confirm
 
-    def register(self, password:str, confirm:str, first:str, middle:str, last:str):
+    def register(self, password: str, confirm: str, first: str, middle: str, last: str):
         first = str.capitalize(first)
         middle = str.capitalize(middle)
         last = str.capitalize(last)
@@ -62,8 +61,7 @@ class UserHandler(DBHandler):
         if is_match:
             logger.debug("Passwords are valid")
 
-
-    def login(self, password:str):
+    def login(self, password: str):
         pass
 
     def logout(self):
@@ -72,13 +70,11 @@ class UserHandler(DBHandler):
     def session(self):
         pass
 
-    
     def deactivate(self):
         pass
 
     def reactivate(self):
         pass
-    
 
     # --------------------------------------------------------
     # --------------------- Counting -------------------------
@@ -86,12 +82,9 @@ class UserHandler(DBHandler):
 
     # Use to get counts inside of the database
 
-
     def user_record_count(self) -> int:
         count = self.count()
         return count
-    
-
 
     # --------------------------------------------------------
     # --------------------- Querying -------------------------
@@ -101,30 +94,29 @@ class UserHandler(DBHandler):
         """ Get the latest user record """
         last_state = self.last()
         return last_state
-    
 
     def many_user(self):
         latest_user_records = self.many(self.limit)
         return latest_user_records
 
-    
     # --------------------------------------------------------
     # ----------------------- Saving -------------------------
     # --------------------------------------------------------
 
-    def save_user(self, data:dict):
+    def save_user(self, data: dict):
         query = copy.copy(self._query)
         query.update(data)
         query['time'] = maya.now()._epoch
         query['type'] = self.entity
         query['timestamp'] = maya.now()._epoch
         self.save(data)
-    
+
 
 def flip(n=0.02):
     if n >= random.uniform(0, 1):
         return True
     return False
+
 
 if __name__ == "__main__":
     user_handler = UserHandler()

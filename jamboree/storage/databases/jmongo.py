@@ -7,11 +7,10 @@ from jamboree.storage.databases import DatabaseConnection
 class MongoDatabaseConnection(DatabaseConnection):
     def __init__(self) -> None:
         super().__init__()
-    
-    
+
     """ Save commands """
 
-    def save(self, query:dict, data:dict):
+    def save(self, query: dict, data: dict):
         if not self.helpers.validate_query(query):
             # Log a warning here instead
             return
@@ -20,7 +19,7 @@ class MongoDatabaseConnection(DatabaseConnection):
         query['timestamp'] = timestamp
         self.connection.store(query)
 
-    def save_many(self, query:Dict[str, Any], data:List[Dict]):
+    def save_many(self, query: Dict[str, Any], data: List[Dict]):
         if not self.helpers.validate_query(query) or len(data) == 0:
             return
 
@@ -32,7 +31,6 @@ class MongoDatabaseConnection(DatabaseConnection):
     """
         Update commands
     """
-    
 
     def update_single(self, query):
         pass
@@ -40,36 +38,33 @@ class MongoDatabaseConnection(DatabaseConnection):
     def update_many(self, query):
         pass
 
-    
-    
     """
         Delete Commands
     """
 
-    def delete(self, query:dict, details:dict):
+    def delete(self, query: dict, details: dict):
         if not self.helpers.validate_query(query):
-            return 
+            return
 
         query.update(details)
         self.connection.delete(query)
-    
-    def delete_many(self, query:dict, details:dict={}):
+
+    def delete_many(self, query: dict, details: dict = {}):
         if not self.helpers.validate_query(query):
-            return 
+            return
 
         query.update(details)
         self.connection.delete_many(query)
 
-    def delete_all(self, query:dict):
+    def delete_all(self, query: dict):
         logger.info("Same as `delete_many`")
         self.delete_many(query)
-
 
     """ 
         Query commands
     """
 
-    def query_latest(self, query:dict):
+    def query_latest(self, query: dict):
         if not self.helpers.validate_query(query):
             return {}
         latest_items = list(self.connection.query_latest(query))
@@ -77,19 +72,17 @@ class MongoDatabaseConnection(DatabaseConnection):
             return latest_items[0]
         return {}
 
-    def query_latest_many(self, query:dict):
+    def query_latest_many(self, query: dict):
         if not self.helpers.validate_query(query):
             return []
         latest_items = list(self.connection.query_latest(query))
         return latest_items
 
-    def query_all(self, query:dict):
+    def query_all(self, query: dict):
         if not self.helpers.validate_query(query):
             return []
         mongo_data = list(self.connection.query(query))
         return mongo_data
-        
-    
 
     """ Swap focused commands"""
 
@@ -99,21 +92,21 @@ class MongoDatabaseConnection(DatabaseConnection):
     def swap(self):
         pass
 
-    
     """ 
         Pop commands
     """
-    def pop(self, query:dict):
+
+    def pop(self, query: dict):
         if not self.helpers.validate_query(query):
             return []
-            
+
         query['limit'] = 1
         item = list(self.connection.query_latest(query))
         if item is not None:
             self.connection.delete(item)
         return item
 
-    def pop_many(self, query:dict, limit:int=10):
+    def pop_many(self, query: dict, limit: int = 10):
         if not self.helpers.validate_query(query):
             return []
 
@@ -124,18 +117,16 @@ class MongoDatabaseConnection(DatabaseConnection):
         for item in items:
             self.connection.delete(item)
         return items
-    
+
     def get_latest_many_swap(self):
         pass
 
-    
     """ Other Functions """
 
-    def reset(self, query:dict):
+    def reset(self, query: dict):
         pass
 
-
-    def count(self, query:dict):
+    def count(self, query: dict):
         if not self.helpers.validate_query(query):
             return 0
         query.pop('limit', None)
