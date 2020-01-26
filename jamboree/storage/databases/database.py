@@ -68,6 +68,15 @@ class DatabaseConnection(ABC):
 
     def query_latest_many(self):
         raise NotImplementedError("query_latest_many not implemented")
+    
+    def query_between(self):
+        raise NotImplementedError("query_between not implemented")
+    
+    def query_before(self):
+        raise NotImplementedError("query_before not implemented")
+    
+    def query_after(self):
+        raise NotImplementedError("query_after not implemented")
 
     def query_all(self):
         pass

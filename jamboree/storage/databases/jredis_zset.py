@@ -25,6 +25,54 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
     """
         Save commands
     """
+    def _kill(self, _hash:str):
+        rlock = f"{_hash}:lock"
+        sub_key = f"{_hash}:single"
+        with self.connection.lock(rlock):
+            self.connection.delete(sub_key)
+
+    def Kill(self, query:dict):
+        """ Deletes a single variable. Bypasses the stack"""
+        if not self.helpers.validate_query(query):
+            return
+
+        _hash = self.helpers.generate_hash(query)
+        self._kill(_hash)
+
+    def _set(self, _hash:str, data:dict):
+        rlock = f"{_hash}:lock"
+        sub_key = f"{_hash}:single"
+        serialized = orjson.dumps(data)
+        with self.connection.lock(rlock):
+            self.connection.set(sub_key, serialized)
+    
+    def Set(self, query:dict, data:dict):
+        """ Sets a single value. It's a wrapper around"""
+        if not self.helpers.validate_query(query) or len(data) == 0:
+            return
+
+        _hash = self.helpers.generate_hash(query)
+        self._set(_hash, data)
+        
+    def _get(self, _hash:str):
+        rlock = f"{_hash}:lock"
+        sub_key = f"{_hash}:single"
+        value = None
+        with self.connection.lock(rlock):
+            value = self.connection.get(sub_key)
+        
+        return value
+        
+
+    def Get(self, query:dict):
+        if not self.helpers.validate_query(query):
+            return None
+        
+        _hash = self.helpers.generate_hash(query)
+        value = self._get(_hash)
+        if value is not None:
+            return orjson.loads(value)
+        return value
 
     def _save(self, _hash: str, data: dict, timing: dict):
         serialized = orjson.dumps(data)
