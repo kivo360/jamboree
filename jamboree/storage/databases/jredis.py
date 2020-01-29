@@ -36,7 +36,6 @@ class RedisDatabaseConnection(DatabaseConnection):
     def save(self, query: dict, data: dict):
         if not self.helpers.validate_query(query):
             return
-
         timestamp = maya.now()._epoch
         _hash = self.helpers.generate_hash(query)
         query.update(data)
@@ -93,7 +92,9 @@ class RedisDatabaseConnection(DatabaseConnection):
         self._update_many(_hash, updated_list)
 
     """
-        Delete Commands
+        # Delete Commands
+        ---
+        
     """
 
     def delete_first(self, query, details):

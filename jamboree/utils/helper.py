@@ -5,10 +5,11 @@ import base64
 from copy import copy
 from abc import ABC
 
+import pandas as pd
 import maya
 import ujson
 import orjson
-from typing import List, Set
+from typing import List, Set, Any, Dict
 
 
 class Helpers(object):
@@ -28,6 +29,27 @@ class Helpers(object):
             item['time'] = _time
         return item
 
+    def convert_to_storable_json(self, json_string:str):
+    
+        savable = {}
+        for key, value in orjson.loads(json_string).items():
+            item_json = orjson.dumps(value)
+            timestamp = float(key) * 0.001
+            savable[item_json] = timestamp
+        return savable
+
+    def convert_dataframe_to_storable_item(self, df:pd.DataFrame) -> dict:
+        data = df.astype(str)
+        data_json = data.to_json(orient='index')
+        value = self.convert_to_storable_json(data_json)
+        return value
+
+    def get_current_abs_time(self, data:dict):
+        _data = copy(data)
+        for k, v in data.items():
+            _data[k] = maya.now()._epoch
+        return _data
+
     def generate_dicts(self, data: dict, _time: float, timestamp: float):
         relative = copy(data)
         absolute = copy(data)
@@ -37,6 +59,47 @@ class Helpers(object):
             "relative": relative,
             "absolute": absolute
         }
+    
+    def is_zero_time(self, item:Dict[str, Any]) -> bool:
+        """ 
+            Check to see if any of the items has a time of zero:
+
+            **Parameters:**
+                - items: List items that represent a sequence of dictionaries from the data store.
+            **Response:**
+                - Is false if there are errors in the timestamp. Or if time or timestamp is 0
+                - return Boolean
+        """
+        # print(item)
+        if "time" not in item and "timestamp" not in item:
+            return False
+        
+        if "time" in item and "timestamp" in item:
+            if item["time"] == 0 or item["timestamp"] == 0:
+                return False
+        if "time" in item:
+            if item["time"] == 0:
+                return False
+        if "timestamp" in item:
+            if item["timestamp"] == 0:
+                return False
+        return True
+
+
+    def filter_zero_time(self, items:List[Dict[str, Any]]) -> bool:
+        """ 
+            Check to see if any of the items has a time of zero:
+
+            **Parameters:**
+                - items: List items that represent a sequence of dictionaries from the data store.
+            **Response:**
+                - Is true if the time or timestamp is 0
+                - return Boolean
+        """
+        filtered = filter(lambda x: self.is_zero_time(x), [])
+        return list(filtered)
+
+
 
     def dictify(self, azset: List[Set], rzset: List[Set]):
         """Create a dictionary"""
@@ -134,3 +197,30 @@ class Helpers(object):
             else:
                 all_bools.append(False)
         return any(all_bools)
+
+    def dynamic_key(self, _hash, absrel):
+        """ Get the absolute key. """
+        current_key = ""
+        if absrel == "absolute":
+            current_key = f"{_hash}:alist"
+        else:
+            current_key = f"{_hash}:rlist"
+        return current_key
+
+    def combine_results(self, akeys, rkeys):
+        dicts = self.dictify(akeys, rkeys)
+        dicts.pop(b'{"placeholder": "place"}', None)
+        combined = self.deserialize_dicts(dicts)
+        return combined
+
+    def combined_abs_rel(self, keys, abs_rel="absolute"):
+        blank_keys = [(b'{"placeholder": "place"}', 0)]
+        dicts = []
+        if abs_rel == "absolute":
+            dicts = self.dictify(keys, blank_keys)
+        else:
+            
+            dicts = self.dictify(blank_keys, keys)
+        dicts.pop(b'{"placeholder": "place"}', None)
+        combined = self.deserialize_dicts(dicts)
+        return combined

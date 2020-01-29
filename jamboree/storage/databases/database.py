@@ -81,26 +81,6 @@ class DatabaseConnection(ABC):
     def query_all(self):
         pass
 
-    """ Swap focused commands"""
-
-    def query_mix_swap(self):
-        raise NotImplementedError("query_mix_swap not implemented")
-
-    def swap(self):
-        raise NotImplementedError("swap not implemented")
-
-    """ 
-        Pop commands
-    """
-
-    def pop(self):
-        raise NotImplementedError("pop not implemented")
-
-    def pop_many(self):
-        raise NotImplementedError("pop_many not implemented")
-
-    def get_latest_many_swap(self):
-        raise NotImplementedError("get_latest_many_swap not implemented")
 
     """ Other Functions """
 

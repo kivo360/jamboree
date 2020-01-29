@@ -23,15 +23,25 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         super().__init__()
 
     """
-        Save commands
+        # Individual Access Methods
+        ---
+        Use commands here to have single variable in place instead of creating an event log. 
+        Very useful for stateful applications such as timeindexing logic.
+
+        ## Core Functions:
+
+        * kill - delete a given hash/key
+        * add  - set a given hash/key to a variable. Usually that should be a dictionary representing a complex value.
+        * get  - get a variable by hash/key
     """
     def _kill(self, _hash:str):
+        """ Deletes a key within a lock"""
         rlock = f"{_hash}:lock"
         sub_key = f"{_hash}:single"
         with self.connection.lock(rlock):
             self.connection.delete(sub_key)
 
-    def Kill(self, query:dict):
+    def kill(self, query:dict):
         """ Deletes a single variable. Bypasses the stack"""
         if not self.helpers.validate_query(query):
             return
@@ -39,20 +49,20 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         _hash = self.helpers.generate_hash(query)
         self._kill(_hash)
 
-    def _set(self, _hash:str, data:dict):
+    def _add(self, _hash:str, data:dict):
         rlock = f"{_hash}:lock"
         sub_key = f"{_hash}:single"
         serialized = orjson.dumps(data)
         with self.connection.lock(rlock):
             self.connection.set(sub_key, serialized)
     
-    def Set(self, query:dict, data:dict):
+    def add(self, query:dict, data:dict):
         """ Sets a single value. It's a wrapper around"""
         if not self.helpers.validate_query(query) or len(data) == 0:
             return
 
         _hash = self.helpers.generate_hash(query)
-        self._set(_hash, data)
+        self._add(_hash, data)
         
     def _get(self, _hash:str):
         rlock = f"{_hash}:lock"
@@ -60,11 +70,10 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         value = None
         with self.connection.lock(rlock):
             value = self.connection.get(sub_key)
-        
         return value
         
 
-    def Get(self, query:dict):
+    def get(self, query:dict):
         if not self.helpers.validate_query(query):
             return None
         
@@ -74,7 +83,16 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
             return orjson.loads(value)
         return value
 
+    """ 
+        # Save Commands
+        ---
+        * `save` - ...
+        * `save_many` - ...
+    """
+
+
     def _save(self, _hash: str, data: dict, timing: dict):
+        """ Appends an event to the stack. """
         serialized = orjson.dumps(data)
         rlock = f"{_hash}:lock"
         relative_time_key = f"{_hash}:rlist"
@@ -90,6 +108,7 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
             self.connection.zadd(absolute_time_key, absolute_data)
 
     def save(self, query: dict, data: dict, _time=None, _timestamp=None):
+        """ Save a single record. """
         if not self.helpers.validate_query(query):
             return
         _hash = self.helpers.generate_hash(query)
@@ -99,57 +118,40 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         data, timing = self.helpers.separate_time_data(query, _time, _timestamp)
         self._save(_hash, data, timing)
 
-    def _save_many(self, _hash: str, data: List[Dict]):
-        serialized_list = [orjson.dumps(x) for x in data]
+    def _save_many(self, _hash: str, relative_data: Dict[str, float] = {}):
+        # serialized_list = [orjson.dumps(x) for x in data]
 
         rlock = f"{_hash}:lock"
+        relative_time_key = f"{_hash}:rlist"
+        absolute_time_key = f"{_hash}:alist"
+        absolute_data = self.helpers.get_current_abs_time(relative_data)
         with self.connection.lock(rlock):
-            push_key = f"{_hash}:list"
-            self.connection.rpush(push_key, *serialized_list)
+            self.connection.zadd(relative_time_key, relative_data)
+            self.connection.zadd(absolute_time_key, absolute_data)
 
-    def save_many(self, query, data: List[Dict] = []):
+    def save_many(self, query, data: Dict[str, float] = {}):
+        """ 
+            # Save Many
+
+            Save multiple records at once. We assume the data was already processed. 
+        """
         if not self.helpers.validate_query(query) or len(data) == 0:
             return
 
-        updated_list = [self.helpers.update_dict(query, x) for x in data]
+        
         _hash = self.helpers.generate_hash(query)
-        self._save_many(_hash, updated_list)
+        self._save_many(_hash, data)
 
-    """
-        Update commands
-    """
 
-    def _update_single(self, _hash: str, data: dict):
-        serialized = orjson.dumps(data)
-        rlock = f"{_hash}:lock"
-        with self.connection.lock(rlock):
-            push_key = f"{_hash}:list"
-            self.connection.rpush(push_key, serialized)
+    """ 
+        # Delete Commands
+        ---
+        * `delete` - Get all of the records related to a given key.
+        * `delete_latest` - Get the `n` latest records according to our query parameters.
+        * `delete_between` - Query between two epoch times.
+        * `delete_before` - Get everything before an epoch time.
+        * `delete_after` - Get everything after epoch time.
 
-    def update_single(self, query: dict, data: dict):
-        if not self.helpers.validate_query(query):
-            return
-        _hash = self.helpers.generate_hash(query)
-        self._update_single(_hash, data)
-
-    def _update_many(self, _hash: str, data: List[Dict] = []):
-        serialized_list = [orjson.dumps(x) for x in data]
-
-        rlock = f"{_hash}:lock"
-        with self.connection.lock(rlock):
-            push_key = f"{_hash}:list"
-            self.connection.rpush(push_key, *serialized_list)
-
-    def update_many(self, query, data: List[Dict] = []):
-        if not self.helpers.validate_query(query) or len(data) == 0:
-            return
-
-        updated_list = [self.connection.update_dict(query, x) for x in data]
-        _hash = self.helpers.generate_hash(query)
-        self._update_many(_hash, updated_list)
-
-    """
-        Delete Commands
     """
 
     def delete_first(self, query, details):
@@ -190,216 +192,145 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         relative_time_key = f"{_hash}:rlist"
         absolute_time_key = f"{_hash}:alist"
         with self.connection.lock(rlock):
-            self.connection.delete(relative_time_key)
-            self.connection.delete(absolute_time_key)
+            keys = self.connection.zrange(relative_time_key, 0, -1, withscores=True)
+    
+            values = [key[0] for key in keys]
+            if len(values) == 0:
+                return
+            
+            self.connection.zrem(relative_time_key, *values)
+            self.connection.zrem(absolute_time_key, *values)
 
-    def delete_all(self, query: dict, details: dict):
+    def delete_all(self, query: dict):
         if not self.helpers.validate_query(query):
             return
 
         _hash = self.helpers.generate_hash(query)
         self._delete_all(_hash)
 
-    """ 
+
+    # def query_between(self, _query, min_epoch, max_epoch, abs_rel="absolute", limit:int=10):
+    #     if not self.helpers.validate_query(_query) or abs_rel not in ["absolute", "relative"]:
+    #         return 
+    #     if self.count(_query) == 0: return []
+    #     _hash = self.helpers.generate_hash(_query)
+        
+    #     _current_key = ""
+    #     if abs_rel == "absolute":
+    #         _current_key = f"{_hash}:alist"
+    #     else:
+    #         _current_key = f"{_hash}:rlist"
+        
+    #     blank_keys = [(b'{"placeholder": "place"}', 0)]
+    #     keys = self.connection.zrangebyscore(_current_key, min=min_epoch, max=max_epoch, withscores=True)
+    #     dicts = []
+    #     if abs_rel == "absolute":
+    #         dicts = self.helpers.dictify(keys, blank_keys)
+    #     else:
+            
+    #         dicts = self.helpers.dictify(blank_keys, keys)
+        
+    #     combined = self.helpers.deserialize_dicts(dicts)
+    #     return combined
+
+    """
         Query commands
+        ---
+        All of the query information we need to operate on.
+
+
+        The query functions we work on:
+
+        1. `query` - Get all of the records related to a given key.
+        2. `query_latest` - Get the `n` latest records according to our query parameters.
+        3. `query_between` - Query between two epoch times.
+        4. `query_before` - Get everything before an epoch time.
+        5. `query_after` - Get everything after epoch time.    
     """
 
-    def query_latest(self, query: dict):
-        if not self.helpers.validate_query(query):
-            return []
 
-        _hash = self.helpers.generate_hash(query)
-        count = self.count(_hash)
-        if count == 0: return []
-
-        latest_redis_items = self.helpers.back_to_dict(self.connection.lrange(f"{_hash}:list", -1, -1))
-        return latest_redis_items
-
-    def query_latest_many(self, query: dict, limit=1000):
-        if not self.helpers.validate_query(query):
-            return []
-
-        _hash = self.helpers.generate_hash(query)
-        count = self.count(_hash)
-        if count == 0: return []
-
-        latest_redis_items = self.helpers.back_to_dict(self.connection.lrange(f"{_hash}:list", -limit, -1))
-        return latest_redis_items
 
     def query_all(self, query: dict):
+        """ Same as query_all """
         if not self.helpers.validate_query(query):
             return []
 
         _hash = self.helpers.generate_hash(query)
         count = self.count(_hash)
         if count == 0: return []
+        
+        relative_time_key = f"{_hash}:rlist"
+        absolute_time_key = f"{_hash}:alist"
+        rkeys = self.connection.zrange(relative_time_key, 0, -1, withscores=True)
+        akeys = self.connection.zrange(absolute_time_key, 0, -1, withscores=True)
+        return self.helpers.combine_results(akeys, rkeys)
 
-        latest_redis_items = self.helpers.back_to_dict(self.connection.lrange(f"{_hash}:list", 0, -1))
-        return latest_redis_items
-
-    """ Swap focused commands"""
-
-    def _latest_many_swap(self, _hash: str, limit: int = 10):
-        """ Actually do the redis operation here. """
-        rlock = f"{_hash}:lock"
-        with self.connection.lock(rlock):
-            with self.connection.pipeline() as pipe:
-                latest_items = []
-                try:
-                    push_key = f"{_hash}:list"
-                    swap_key = f"{_hash}:swap"
-
-                    pipe.watch(push_key)
-                    pipe.watch(swap_key)
-                    main_count = pipe.llen(push_key)
-                    swap_count = pipe.llen(swap_key)
-
-                    if main_count == 0 and swap_count == 0: raise AttributeError("Skip further queries")
-
-                    # Determine the amount we're going to get from the main search
-                    limit_swap_diff = limit - swap_count
-
-                    main_req = 0
-                    swap_req = 0
-
-                    # ----------------------------------------------------------
-                    # -------------- Get the query requirements ----------------
-                    # ----------------------------------------------------------
-
-                    # logger.info(main_count)
-                    # logger.info(swap_count)
-                    if limit_swap_diff < 0:
-                        swap_req = limit
-                    elif limit_swap_diff >= 1:
-                        swap_req = swap_count
-                        main_req = limit_swap_diff
-
-                    main_latest_items = []
-                    if main_req != 0:
-                        main_latest_items = pipe.lrange(push_key, -main_req, -1)
-
-                    swap_latest_items = list(reversed(pipe.lrange(swap_key, -swap_req, -1)))
-                    latest_items = main_latest_items + swap_latest_items
-                    # means the count of the swapped elements is less than the total limit, yet isn't empty
-                    pipe.execute()
-                    logger.info(latest_items)
-                except Exception as e:
-                    logger.error(str(e))
-                finally:
-                    pipe.reset()
-
-                if len(latest_items) > 0:
-                    items = self.helpers.back_to_dict(latest_items)
-
-                    return items
-                return latest_items
-
-    def query_mix(self, query: dict, _limit: int):
-        if not self.helpers.validate_query(query):
-            return []
-
-        _hash = self.helpers.generate_hash(query)
-        count = self.count(_hash)
-        if count == 0: return []
-        return self._latest_many_swap(_hash, _limit)
-
-    def query_latest_swap(self, query: dict):
-        if not self.helpers.validate_query(query):
+    def query_latest(self, _query, abs_rel="absolute", limit:int=10):
+        if not self.helpers.validate_query(_query) or abs_rel not in ["absolute", "relative"]:
             return {}
-
-        _hash = self.helpers.generate_hash(query)
-        count = self.count(_hash)
-        if count == 0: return {}
-        return self._latest_many_swap(_hash, 1)
-
-    def _swap(self, _hash: str, limit):
-        rlock = f"{_hash}:lock"
-        with self.connection.lock(rlock):
-            with self.connection.pipeline() as pipe:
-                latest_items = []
-                try:
-                    push_key = f"{_hash}:list"
-                    swap_key = f"{_hash}:swap"
-                    pipe.watch(push_key)
-                    pipe.watch(swap_key)
-
-                    abs_limit = abs(limit)
-
-                    latest_items = pipe.lrange(push_key, -(abs_limit), -1)
-                    latest_items_reversed = copy(latest_items)
-                    pipe.ltrim(push_key, 0, -(abs_limit + 1))
-                    if len(latest_items) > 0:
-                        latest_items_reversed = list(reversed(latest_items_reversed))
-                        pipe.rpush(swap_key, *latest_items_reversed)
-
-                    pipe.execute()
-
-                except Exception as e:
-                    logger.info(str(e))
-                finally:
-                    pipe.reset()
-                if len(latest_items) > 0:
-                    return self.helpers.back_to_dict(latest_items)
-                return latest_items
-
-    def swap(self, query: dict, limit: int = 100):
-        if not self.helpers.validate_query(query):
-            return []
-
-        _hash = self.helpers.generate_hash(query)
+        _hash = self.helpers.generate_hash(_query)
         count = self.count(_hash)
         if count == 0: return []
-        return self._swap(_hash, limit)
 
-    def swap_one(self, query):
-        if not self.helpers.validate_query(query):
-            return []
+        
+        _current_key = self.helpers.dynamic_key(_hash, abs_rel)
+        keys = self.connection.zrange(_current_key, -1, -1, withscores=True)
+        if len(keys) == 0: return []
+        combined = self.helpers.combined_abs_rel(keys, abs_rel=abs_rel)
+        return combined[-1]
 
-        _hash = self.helpers.generate_hash(query)
+    def query_between(self, _query:dict, min_epoch:float, max_epoch:float, abs_rel:str="absolute"):
+        if not self.helpers.validate_query(_query) or abs_rel not in ["absolute", "relative"]:
+            return 
+        _hash = self.helpers.generate_hash(_query)
         count = self.count(_hash)
         if count == 0: return []
-        limit = 1
-        return self._swap(_hash, limit)
 
-    """ 
-        Pop commands
-    """
+        _current_key = self.helpers.dynamic_key(_hash, abs_rel)
+        keys = self.connection.zrangebyscore(_current_key, min=min_epoch, max=max_epoch, withscores=True)
+        combined = self.helpers.combined_abs_rel(keys, abs_rel=abs_rel)
+        return combined
 
-    def _pop_many(self, _hash: str, limit: int = 10):
-        rlock = f"{_hash}:lock"
-        with self.connection.lock(rlock):
-            with self.connection.pipeline() as pipe:
-                latest_items = []
-                try:
-                    push_key = f"{_hash}:list"
-                    pipe.watch(push_key)
-                    latest_items = pipe.lrange(push_key, -limit, -1)
-                    pipe.ltrim(push_key, 0, -limit)
-                    pipe.execute()
 
-                except Exception as e:
-                    pass
-                finally:
-                    pipe.reset()
-                if len(latest_items) > 0:
-                    return self.helpers.back_to_dict(latest_items)
-                return latest_items
+    def query_latest_by_time(self, _query, max_epoch, abs_rel="absolute", limit:int=10):
+        """ Get the closest item to a given timestamp. Simply pass in an epoch then watch things fly"""
+        if not self.helpers.validate_query(_query) or abs_rel not in ["absolute", "relative"]:
+            return 
+        _hash = self.helpers.generate_hash(_query)
+        count = self.count(_hash)
+        if count == 0: return []
+        _current_key = self.helpers.dynamic_key(_hash, abs_rel)
+        
 
-    def pop(self, query: dict, limit=1):
-        if not self.helpers.validate_query(query):
+        keys = self.connection.zrangebyscore(_current_key, min=max_epoch, max="+inf", start=0, num=1, withscores=True)
+        combined = self.helpers.combined_abs_rel(keys, abs_rel)
+        if len(combined) == 0:
             return {}
-        _hash = self.helpers.generate_hash(query)
-        if self.count(_hash) == 0:
-            return {}
-        return self._pop_many(_hash, limit=limit)
+        return combined[0]
+    
+    def query_before(self, _query, max_epoch, abs_rel="absolute"):
+        if not self.helpers.validate_query(_query) or abs_rel not in ["absolute", "relative"]:
+            return 
+        _hash = self.helpers.generate_hash(_query)
+        count = self.count(_hash)
+        if count == 0: return []
+        _current_key = self.helpers.dynamic_key(_hash, abs_rel)
+        keys = self.connection.zrangebyscore(_current_key, min="-inf", max=max_epoch, withscores=True)
+        combined = self.helpers.combined_abs_rel(keys, abs_rel)
+        return combined
+    
+    def query_after(self, _query, min_epoch, abs_rel="absolute"):
+        if not self.helpers.validate_query(_query) or abs_rel not in ["absolute", "relative"]:
+            return 
+        _hash = self.helpers.generate_hash(_query)
+        count = self.count(_hash)
+        if count == 0: return []
+        _current_key = self.helpers.dynamic_key(_hash, abs_rel)
+        keys = self.connection.zrangebyscore(_current_key, min=min_epoch, max="+inf", withscores=True)
+        combined = self.helpers.combined_abs_rel(keys, abs_rel)
+        return combined
 
-    def pop_many(self, query: dict, limit=100):
-        if not self.helpers.validate_query(query):
-            return []
-        _hash = self.helpers.generate_hash(query)
-        if self.count(_hash) == 0:
-            return []
-        return self._pop_many(_hash, limit=limit)
+
 
     """
         Other Functions
@@ -436,7 +367,8 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         if not self.helpers.validate_query(query): return
         self.pool.schedule(self._reset_count, args=(query, mongo_data))
 
-    def count(self, _hash: str) -> int:
-        _count_hash = f"{_hash}:list"
-        count = self.connection.llen(_count_hash)
+    def count(self, _hash: str):
+        # ZCARD to get the length of the zset
+        _count_hash = f"{_hash}:alist"
+        count = self.connection.zcard(_count_hash)
         return int(count)

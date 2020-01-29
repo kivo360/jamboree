@@ -5,15 +5,13 @@ import pandas as pd
 import numpy as np
 import maya
 from jamboree import DBHandler
-# from jamboree import Jamboree
-from jamboree.base.refactor import Jamboree
-from jamboree.base.
+from jamboree.base.refactor_final import Jamboree
 import random
 from random import randint
 from contextlib import ContextDecorator
-from pprint import pprint
-from crayons import blue, red
-from toolz.itertoolz import pluck
+# from pprint import pprint
+# from crayons import blue, red
+# from toolz.itertoolz import pluck
 from copy import copy
 from loguru import logger
 
@@ -79,9 +77,6 @@ class SampleEnvHandler(DBHandler):
 
         return vaex.from_pandas(pd.DataFrame())
 
-    
-
-    
     def save_update_recent(self, data: dict):
         transactions = self.transactions
         count = transactions.count()
@@ -133,19 +128,17 @@ def main():
     sample_env_handler.event = jambo
     sample_env_handler['episode'] = uuid.uuid1().hex
     # with timecontext():
-    current_time = time.time()
+    current_time = maya.now()._epoch
     mult = 60
 
     # Create a new set of records and swap to another location to be acted on.
     sample_env_handler['episode'] = uuid.uuid1().hex
     with timecontext():
         for _ in range(1000):
-            v1 = randint(0, 12)
+            v1 = random.uniform(0, 12)
             sample_env_handler.save({"value": v1, "time": (current_time + (mult * _))})
-
-        print("Save one data type")
-        print("Load another data type into it's own bucket")
-        sample_env_handler.load_to_backtest()
+        latest = sample_env_handler.last()
+        logger.info(latest)
 
 
 if __name__ == "__main__":

@@ -64,13 +64,11 @@ class MongoDatabaseConnection(DatabaseConnection):
         Query commands
     """
 
-    def query_latest(self, query: dict):
+    def query_latest(self, query: dict, abs_rel="absolute"):
         if not self.helpers.validate_query(query):
             return {}
-        latest_items = list(self.connection.query_latest(query))
-        if len(latest_items) > 0:
-            return latest_items[0]
-        return {}
+        latest_items = self.connection.query_last(query)
+        return latest_items
 
     def query_latest_many(self, query: dict):
         if not self.helpers.validate_query(query):
@@ -79,6 +77,34 @@ class MongoDatabaseConnection(DatabaseConnection):
         return latest_items
 
     def query_all(self, query: dict):
+        if not self.helpers.validate_query(query):
+            return []
+        mongo_data = list(self.connection.query(query))
+        return mongo_data
+    
+
+    def query_latest_by_time(self, query:dict, max_epoch:float, abs_rel:str="absolute", limit:int=10):
+        if not self.helpers.validate_query(query):
+            return {}
+        latest_items = self.connection.query_closest(query)
+        return latest_items
+
+    def query_between(self, query:dict, min_epoch:float, max_epoch:float, abs_rel:str="absolute"):
+        if not self.helpers.validate_query(query):
+            return {}
+        
+        latest_items = list(self.connection.query_time(query, time_type="window", start=min_epoch))
+        if len(latest_items) == 0:
+            return []
+        return latest_items
+    
+    def query_before(self, query):
+        if not self.helpers.validate_query(query):
+            return []
+        mongo_data = list(self.connection.query(query))
+        return mongo_data
+    
+    def query_after(self, query):
         if not self.helpers.validate_query(query):
             return []
         mongo_data = list(self.connection.query(query))
