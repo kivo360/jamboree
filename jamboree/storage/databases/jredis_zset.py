@@ -209,30 +209,6 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         self._delete_all(_hash)
 
 
-    # def query_between(self, _query, min_epoch, max_epoch, abs_rel="absolute", limit:int=10):
-    #     if not self.helpers.validate_query(_query) or abs_rel not in ["absolute", "relative"]:
-    #         return 
-    #     if self.count(_query) == 0: return []
-    #     _hash = self.helpers.generate_hash(_query)
-        
-    #     _current_key = ""
-    #     if abs_rel == "absolute":
-    #         _current_key = f"{_hash}:alist"
-    #     else:
-    #         _current_key = f"{_hash}:rlist"
-        
-    #     blank_keys = [(b'{"placeholder": "place"}', 0)]
-    #     keys = self.connection.zrangebyscore(_current_key, min=min_epoch, max=max_epoch, withscores=True)
-    #     dicts = []
-    #     if abs_rel == "absolute":
-    #         dicts = self.helpers.dictify(keys, blank_keys)
-    #     else:
-            
-    #         dicts = self.helpers.dictify(blank_keys, keys)
-        
-    #     combined = self.helpers.deserialize_dicts(dicts)
-    #     return combined
-
     """
         Query commands
         ---
