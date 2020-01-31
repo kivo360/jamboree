@@ -1,3 +1,4 @@
+import random
 from abc import ABC
 from copy import copy
 import maya
@@ -9,45 +10,12 @@ from funtime import Store
 from pebble.pool import ThreadPool
 import base64
 from multiprocessing import cpu_count
-from crayons import green, yellow
 from loguru import logger
-import random
-from jamboree.storage.databases import MongoDatabaseConnection, RedisDatabaseConnection
+from crayons import green, yellow
+from jamboree.storage.databases import MongoDatabaseConnection, ZRedisDatabaseConnection
+from jamboree.utils.helper import Helpers
+from .processor import EventProcessor
 
-
-class EventProcessor(ABC):
-    def save(self, query: dict, data: dict):
-        raise NotImplementedError
-
-    def get_latest(self, query):
-        raise NotImplementedError
-
-    def get_latest_many(self, query, limit=1000):
-        raise NotImplementedError
-
-    def save_many(self, query: dict, data: List[dict]):
-        raise NotImplementedError
-
-    def count(self, query: dict):
-        raise NotImplementedError
-
-    def remove_first(self, query: dict):
-        raise NotImplementedError
-
-    def pop_multiple(self, query: dict, limit: int):
-        raise NotImplementedError
-
-    def _bulk_save(self, query: dict, data: list):
-        raise NotImplementedError
-
-    def multi_swap(self, query: dict, limit: int = 100):
-        raise NotImplementedError
-
-    def query_mix(self, query: dict, limit: int = 100):
-        raise NotImplementedError
-
-    def get_latest_many_swap(self, query: dict, limit: int):
-        raise NotImplementedError
 
 
 class Jamboree(EventProcessor):
@@ -56,11 +24,13 @@ class Jamboree(EventProcessor):
     def __init__(self, mongodb_host="localhost", redis_host="localhost", redis_port=6379):
         self.redis = Redis(redis_host, port=redis_port)
         self.store = Store(mongodb_host).create_lib('events').get_store()['events']
-        self.pool = ThreadPool(max_workers=cpu_count() * 4)
+        self.pool = ThreadPool(max_workers=cpu_count() * 6)
         self.mongo_conn = MongoDatabaseConnection()
-        self.redis_conn = RedisDatabaseConnection()
+        self.redis_conn = ZRedisDatabaseConnection()
         self.mongo_conn.connection = self.store
         self.redis_conn.connection = self.redis
+        self.dominant_database = ""
+        self.helpers = Helpers()
         # self.redis_conn.pool = self.pool
         # self.mongo_conn.pool = self.pool
 
@@ -87,19 +57,7 @@ class Jamboree(EventProcessor):
             return False
         return True
 
-    def _update_dict(self, query: dict, data: dict):
-        query = copy(query)
-        timestamp = maya.now()._epoch
-        query['timestamp'] = timestamp
-        data.update(query)
-        return data
-
-    def _update_dict_no_timestamp(self, query: dict, data: dict):
-        query = copy(query)
-        data = copy(data)
-        data.update(query)
-        data.pop("timestamp", None)
-        return data
+    
 
     def _omit_timestamp(self, data: dict):
         """ Removes timestamp if it exists. Use it to create a copied version of a dictionary to be saved in the duplicate list """
@@ -116,14 +74,15 @@ class Jamboree(EventProcessor):
             deserialized.append(orjson.loads(i))
         return deserialized
 
-    def _save(self, query: dict, data: dict):
+    def _save(self, query: dict, data: dict, abs_rel="absolute"):
         """
+            # TODO: Readd mongo
             Given a type (data entity), data and a epoch for time (utc time only), save the data in both redis and mongo. 
             Does it in a background process. Use with add event.
             We save the information both in mongodb and redis. We assume there's many of each collection. We find a specific collection using the query.
         """
         self.redis_conn.save(query, data)
-        self.pool.schedule(self.mongo_conn.save, args=(query, data))
+        # self.pool.schedule(self.mongo_conn.save, args=(query, data))
 
     """
         RESET FUNCTIONS
@@ -131,12 +90,12 @@ class Jamboree(EventProcessor):
 
     def _reset_count(self, query: dict):
         """ Reset the count for the current mongodb query. We do this by adding records in mongo back into redis. """
-        all_elements = self.mongo_conn.query_all(query)
-        self.pool.schedule(self.redis_conn.reset, args=(query, all_elements))
+        # all_elements = self.mongo_conn.query_all(query)
+        # self.pool.schedule(self.redis_conn.reset, args=(query, all_elements))
 
     def reset(self, query: dict):
         """ Resets all of the variables """
-        self.pool.schedule(self._reset_count, args=(query))
+        # self.pool.schedule(self._reset_count, args=(query))
 
     """
         DELETES FUNCTIONS
@@ -150,15 +109,11 @@ class Jamboree(EventProcessor):
             It's a heavy computation on redis, as it'll require searching an entire list.
             
         """
-        self.pool.schedule(self.mongo_conn.delete_all, args=(query, details))
+        # self.pool.schedule(self.mongo_conn.delete_all, args=(query, details))
         self.redis_conn.delete(query, details)
         self.pool.schedule(self.redis_conn.delete_all, args=(query))
 
     def _remove_first_redis(self, _hash, query: dict):
-        # rlock = f"{_hash}:lock"
-        # with self.redis.lock(rlock):
-        #     push_key = f"{_hash}:list"
-        #     self.redis.rpop(push_key)
         pass
 
     def remove_first(self, query: dict):
@@ -175,7 +130,7 @@ class Jamboree(EventProcessor):
         SAVE FUNCTIONS
     """
 
-    def save(self, query: dict, data: dict):
+    def save(self, query: dict, data: dict, abs_rel="absolute"):
         self._save(query, data)
 
     def save_many(self, query: dict, data: List[dict]):
@@ -183,57 +138,20 @@ class Jamboree(EventProcessor):
             # Log a warning here instead
             return
 
-        if len(data) == 0:
-            return
+        if len(data) == 0: return
+        data_list = [self.helpers.update_dict(query, item) for item in data]
+        self._bulk_save(query, data_list)
 
-        for item in data:
-            self._save(query, item)
-
-    def bulk_upsert_redis(self, query, data):
-        logger.info("Default retcon redis")
-        self.pool.schedule(self.redis_conn.update_many, args=(query, data))
 
     def _bulk_save(self, query, data: list):
         """ Bulk adds a list to redis."""
+        events = self.helpers.convert_to_storable_relative(data)
+        self.redis_conn.save_many(query, events)
+        # self.pool.schedule(self.mongo_conn.save_many, args=(query, data))
 
-        self.redis_conn.save_many(query, data)
-        self.pool.schedule(self.mongo_conn.save_many, args=(query, data))
-
-    def _save_redis(self, _hash: str, data: dict):
-
-        serialized = orjson.dumps(data)
-        rlock = f"{_hash}:lock"
-        with self.redis.lock(rlock):
-            push_key = f"{_hash}:list"
-            self.redis.rpush(push_key, serialized)
-
-    def _bulk_save_redis(self, _hash: str, data: list):
-        serialized_list = [orjson.dumps(x) for x in data]
-
-        rlock = f"{_hash}:lock"
-        with self.redis.lock(rlock):
-            push_key = f"{_hash}:list"
-            self.redis.rpush(push_key, *serialized_list)
 
     def _pop_redis_multiple(self, _hash, limit: int):
-        rlock = f"{_hash}:lock"
-        with self.redis.lock(rlock):
-            with self.redis.pipeline() as pipe:
-                latest_items = []
-                try:
-                    push_key = f"{_hash}:list"
-                    pipe.watch(push_key)
-                    latest_items = pipe.lrange(push_key, -limit, -1)
-                    pipe.ltrim(push_key, 0, -limit)
-                    pipe.execute()
-
-                except Exception as e:
-                    pass
-                finally:
-                    pipe.reset()
-                if len(latest_items) > 0:
-                    return self.back_to_dict(latest_items)
-                return latest_items
+        return []
 
     def pop_multiple(self, query, limit: int = 1):
         """ Get multiple items """
@@ -254,42 +172,43 @@ class Jamboree(EventProcessor):
 
     def query_direct_latest(self, query):
         """ Queries from mongodb directly. Used to search extremely large queries. """
-        latest_items = list(self.store.query_latest(query))
-        if len(latest_items) > 0:
-            return latest_items[0]
-        return {}
+        return self.mongo_conn.query_latest(query)
 
-    def get_latest(self, query):
+    def get_latest(self, query, abs_rel="absolute"):
         """ Gets the latest query"""
         # Add a conditional time lock
         _hash = self._generate_hash(query)
-        count = self._get_count(_hash, query)
+        count, database = self._get_count(_hash, query)
         if count > 0:
-            return self.back_to_dict(self.redis.lrange(f"{_hash}:list", -1, -1))
-        # Mongo, slowdown
-        latest_items = list(self.store.query_latest(query))
-        if len(latest_items) > 0:
-            return latest_items[0]
+            return self.redis_conn.query_latest(query, abs_rel)
         return {}
+        # # Mongo, slowdown
+        # return self.mongo_conn.query_latest(query)
 
-    def get_latest_many(self, query: dict, limit=1000):
+    def get_latest_many(self, query: dict, limit=1000, abs_rel="absolute"):
 
         if self._validate_query(query) == False: return []
         _hash = self._generate_hash(query)
         count = self._get_count(_hash, query)
         if count == 0: return []
 
-        latest_redis_items = self.back_to_dict(self.redis.lrange(f"{_hash}:list", -limit, -1))
-        # TODO: Get mongo tasks here
-        # How will this work now?
-        rlen = len(latest_redis_items)
-        if rlen == 0:
-            query["limit"] = limit
-            latest_items = list(self.store.query_latest(query))
-            self.reset(query)
-            return latest_items
 
+
+        latest_redis_items = self.redis_conn.query_latest_many(query, abs_rel=abs_rel, limit=limit)
         return latest_redis_items
+
+
+    """ New Queries """
+
+
+    def get_between(self, query:dict, min_epoch:float, max_epoch:float, abs_rel:str="absolute"):
+        items = self.redis_conn.query_between(query, min_epoch, max_epoch, abs_rel)
+        return items
+    
+
+    def get_latest_by(self, query:dict, max_epoch, abs_rel="absolute", limit:int=10):
+        item = self.redis_conn.query_latest_by_time(query, max_epoch, abs_rel)
+        return item
 
     """
         SEARCH ONE FUNCTIONS
@@ -309,18 +228,31 @@ class Jamboree(EventProcessor):
 
     def _get_count(self, _hash: str, query: dict):
         # Checks to see if a count already exist in redis, if not, check for a count in mongo.
-        _count_hash = f"{_hash}:list"
-        count = self.redis.llen(_count_hash)
+        count = self.redis_conn.count(_hash)
         if count is not None:
-            return count
+            return count, "redis"
 
         records = list(self.store.query(query))
         record_len = len(records)
-        return record_len
+        return record_len, "mongo"
 
     def count(self, query):
         """ """
         if self._validate_query(query) == False: return []
         _hash = self._generate_hash(query)
-        count = self._get_count(_hash, query)
+        count, database = self._get_count(_hash, query)
+        self.dominant_database = database
         return count
+
+    def single_get(self, query:dict):
+        if self._validate_query(query) == False: return {}
+        item = self.redis_conn.get(query)
+        return item 
+
+    def single_set(self, query:dict, data:dict):
+        if self._validate_query(query) == False: return
+        self.redis_conn.add(query, data)
+
+    def single_delete(self, query:dict):
+        if self._validate_query(query) == False: return
+        self.redis_conn.kill(query)

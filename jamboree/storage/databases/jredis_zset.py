@@ -1,10 +1,12 @@
-from typing import Dict, List
-from copy import copy
-
 import maya
 import orjson
-from loguru import logger
+from copy import copy
 
+
+from loguru import logger
+from typing import Dict, List
+from crayons import yellow
+from pprint import pprint
 from jamboree.storage.databases import DatabaseConnection
 
 
@@ -41,13 +43,7 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         with self.connection.lock(rlock):
             self.connection.delete(sub_key)
 
-    def kill(self, query:dict):
-        """ Deletes a single variable. Bypasses the stack"""
-        if not self.helpers.validate_query(query):
-            return
-
-        _hash = self.helpers.generate_hash(query)
-        self._kill(_hash)
+    
 
     def _add(self, _hash:str, data:dict):
         rlock = f"{_hash}:lock"
@@ -56,13 +52,7 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         with self.connection.lock(rlock):
             self.connection.set(sub_key, serialized)
     
-    def add(self, query:dict, data:dict):
-        """ Sets a single value. It's a wrapper around"""
-        if not self.helpers.validate_query(query) or len(data) == 0:
-            return
-
-        _hash = self.helpers.generate_hash(query)
-        self._add(_hash, data)
+    
         
     def _get(self, _hash:str):
         rlock = f"{_hash}:lock"
@@ -71,17 +61,39 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         with self.connection.lock(rlock):
             value = self.connection.get(sub_key)
         return value
-        
+
+
+    
+
 
     def get(self, query:dict):
         if not self.helpers.validate_query(query):
-            return None
-        
+            return {}
+
         _hash = self.helpers.generate_hash(query)
         value = self._get(_hash)
         if value is not None:
             return orjson.loads(value)
-        return value
+        return {}
+
+
+    def add(self, query:dict, data:dict):
+        """ Sets a single value. It's a wrapper around"""
+        if not self.helpers.validate_query(query) or len(data) == 0:
+            return
+
+        _hash = self.helpers.generate_hash(query)
+        self._add(_hash, data)
+
+
+    def kill(self, query:dict):
+        """ Deletes a single variable. Bypasses the stack"""
+        if not self.helpers.validate_query(query):
+            return
+
+        _hash = self.helpers.generate_hash(query)
+        self._kill(_hash)
+
 
     """ 
         # Save Commands
@@ -112,8 +124,6 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         if not self.helpers.validate_query(query):
             return
         _hash = self.helpers.generate_hash(query)
-
-        # timestamp=maya.now()._epoch
         query.update(data)
         data, timing = self.helpers.separate_time_data(query, _time, _timestamp)
         self._save(_hash, data, timing)
@@ -129,7 +139,7 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
             self.connection.zadd(relative_time_key, relative_data)
             self.connection.zadd(absolute_time_key, absolute_data)
 
-    def save_many(self, query, data: Dict[str, float] = {}):
+    def save_many(self, query, data: Dict[str, float] = {}, abs_rel="absolute"):
         """ 
             # Save Many
 
@@ -225,7 +235,6 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
     """
 
 
-
     def query_all(self, query: dict):
         """ Same as query_all """
         if not self.helpers.validate_query(query):
@@ -246,18 +255,33 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
             return {}
         _hash = self.helpers.generate_hash(_query)
         count = self.count(_hash)
-        if count == 0: return []
+        if count == 0: return {}
 
         
         _current_key = self.helpers.dynamic_key(_hash, abs_rel)
+        logger.info(yellow(_current_key))
         keys = self.connection.zrange(_current_key, -1, -1, withscores=True)
-        if len(keys) == 0: return []
+        if len(keys) == 0: return {}
         combined = self.helpers.combined_abs_rel(keys, abs_rel=abs_rel)
         return combined[-1]
 
+    def query_latest_many(self, _query, abs_rel="absolute", limit:int=10):
+        if not self.helpers.validate_query(_query) or abs_rel not in ["absolute", "relative"]:
+            return {}
+        _hash = self.helpers.generate_hash(_query)
+        count = self.count(_hash)
+        if count == 0: return {}
+
+        
+        _current_key = self.helpers.dynamic_key(_hash, abs_rel)
+        keys = self.connection.zrange(_current_key, -limit, -1, withscores=True)
+        if len(keys) == 0: return {}
+        combined = self.helpers.combined_abs_rel(keys, abs_rel=abs_rel)
+        return combined
+
     def query_between(self, _query:dict, min_epoch:float, max_epoch:float, abs_rel:str="absolute"):
         if not self.helpers.validate_query(_query) or abs_rel not in ["absolute", "relative"]:
-            return 
+            return []
         _hash = self.helpers.generate_hash(_query)
         count = self.count(_hash)
         if count == 0: return []
@@ -271,7 +295,7 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
     def query_latest_by_time(self, _query, max_epoch, abs_rel="absolute", limit:int=10):
         """ Get the closest item to a given timestamp. Simply pass in an epoch then watch things fly"""
         if not self.helpers.validate_query(_query) or abs_rel not in ["absolute", "relative"]:
-            return 
+            return  []
         _hash = self.helpers.generate_hash(_query)
         count = self.count(_hash)
         if count == 0: return []
@@ -286,7 +310,7 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
     
     def query_before(self, _query, max_epoch, abs_rel="absolute"):
         if not self.helpers.validate_query(_query) or abs_rel not in ["absolute", "relative"]:
-            return 
+            return []
         _hash = self.helpers.generate_hash(_query)
         count = self.count(_hash)
         if count == 0: return []
@@ -297,7 +321,7 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
     
     def query_after(self, _query, min_epoch, abs_rel="absolute"):
         if not self.helpers.validate_query(_query) or abs_rel not in ["absolute", "relative"]:
-            return 
+            return []
         _hash = self.helpers.generate_hash(_query)
         count = self.count(_hash)
         if count == 0: return []
@@ -343,7 +367,7 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         if not self.helpers.validate_query(query): return
         self.pool.schedule(self._reset_count, args=(query, mongo_data))
 
-    def count(self, _hash: str):
+    def count(self, _hash: str) -> int:
         # ZCARD to get the length of the zset
         _count_hash = f"{_hash}:alist"
         count = self.connection.zcard(_count_hash)

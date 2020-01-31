@@ -1,6 +1,7 @@
 """
     A class that holds all of the helper functions.
 """
+import uuid
 import base64
 from copy import copy
 from abc import ABC
@@ -38,6 +39,44 @@ class Helpers(object):
             savable[item_json] = timestamp
         return savable
 
+    def convert_to_storable(self, items:list):
+        savable = {}
+        for item in items:
+            timestamp = float(item.pop("timestamp", maya.now()._epoch))
+            item_json = orjson.dumps(item)
+            savable[item_json] = timestamp
+        
+        return savable
+    
+    def convert_to_storable_abs(self, items:list):
+        savable = {}
+        for item in items:
+            timestamp = float(item.pop("timestamp", maya.now()._epoch))
+            item_json = orjson.dumps(item)
+            savable[item_json] = timestamp
+        
+        return savable
+    
+    def convert_to_storable_relative(self, items:list):
+        savable = {}
+        for item in items:
+            timestamp = float(item.pop("time", maya.now()._epoch))
+            item_json = orjson.dumps(item)
+            savable[item_json] = timestamp
+        
+        return savable
+
+
+    def dual_storable(self, items:list):
+        relative = self.convert_to_storable_relative(items)
+        absolute = self.convert_to_storable_abs(items)
+        return {
+            "relative": relative,
+            "absolute": absolute
+        }
+        
+
+
     def convert_dataframe_to_storable_item(self, df:pd.DataFrame) -> dict:
         data = df.astype(str)
         data_json = data.to_json(orient='index')
@@ -60,6 +99,12 @@ class Helpers(object):
             "absolute": absolute
         }
     
+    def is_abs_rel(self, query_type:str):
+        if query_type in ["absolute", "relative"]:
+            return True
+        
+        return False
+
     def is_zero_time(self, item:Dict[str, Any]) -> bool:
         """ 
             Check to see if any of the items has a time of zero:
@@ -119,6 +164,15 @@ class Helpers(object):
             adict[item] = current_item
 
         return adict
+
+    def add_event_id(self, event:dict):
+        event['event_id'] = uuid.uuid4().hex
+        return event
+
+    def add_event_ids(self, data:List[Dict[str, Any]]):
+        """ Add event ids to a list of events. Use for a save many query. """
+        events = [self.add_event_id(x) for x in data]
+        return events
 
     def check_time(self, _time: float = None, _timestamp: float = None, local_time: float = None,
                    local_timestamp: float = None):
@@ -224,3 +278,11 @@ class Helpers(object):
         dicts.pop(b'{"placeholder": "place"}', None)
         combined = self.deserialize_dicts(dicts)
         return combined
+    
+    def convert_to_storable_json_list(self, json_string) -> list:
+        converted_list = []
+        for key, value in orjson.loads(json_string).items():
+            item_json = value
+            item_json['time'] = float(key) * 0.001
+            converted_list.append(item_json)
+        return converted_list

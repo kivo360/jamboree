@@ -1,20 +1,17 @@
 import time
+import maya
 import vaex
 import uuid
-import pandas as pd
-import numpy as np
-import maya
-from jamboree import DBHandler
-from jamboree.base.refactor_final import Jamboree
 import random
-from random import randint
-from contextlib import ContextDecorator
-# from pprint import pprint
-# from crayons import blue, red
-# from toolz.itertoolz import pluck
+import numpy as np
+import pandas as pd
 from copy import copy
+from crayons import red, magenta, cyan
 from loguru import logger
-
+from jamboree import DBHandler
+from jamboree import Jamboree
+from contextlib import ContextDecorator
+from pprint import pprint
 
 class timecontext(ContextDecorator):
     def __enter__(self):
@@ -87,24 +84,6 @@ class SampleEnvHandler(DBHandler):
     def pop_many(self, _limit: int = 1, alt: dict = {}):
         return super().pop_many(_limit, alt)
 
-    def load_to_backtest(self, alt: dict = {}):
-        # Get the current record first
-
-        current_backtest = self.copy()
-        current_backtest['opt_type'] = "backtest"
-        current_backtest['episode'] = uuid.uuid4().hex
-        logger.info(self['episode'])
-        logger.info(current_backtest['episode'])
-
-        last_1000 = self.many(limit=self.limit)
-
-        logger.info(len(last_1000))
-
-        current_backtest.save_many(last_1000)
-        current_backtest.swap_many(limit=5)
-        swapped = current_backtest.query_mix(limit=5)
-        logger.info(red(swapped))
-
     def copy(self):
         new_sample = SampleEnvHandler()
         new_sample.data = copy(self.data)
@@ -126,7 +105,6 @@ def main():
     sample_env_handler = SampleEnvHandler()
     sample_env_handler.limit = 250
     sample_env_handler.event = jambo
-    sample_env_handler['episode'] = uuid.uuid1().hex
     # with timecontext():
     current_time = maya.now()._epoch
     mult = 60
@@ -134,11 +112,36 @@ def main():
     # Create a new set of records and swap to another location to be acted on.
     sample_env_handler['episode'] = uuid.uuid1().hex
     with timecontext():
-        for _ in range(1000):
+        super_index = 0
+        for _ in range(100):
             v1 = random.uniform(0, 12)
-            sample_env_handler.save({"value": v1, "time": (current_time + (mult * _))})
+            sample_env_handler.save({"value": v1, "time": (current_time + (mult * super_index))})
+            super_index += 1
+        
+        many_list = []
+        catch_index_1 = random.randint(super_index-10, super_index+3)
+        catch_index_2 = random.randint(super_index-10, super_index+3)
+        last_by_time = (current_time + (mult * catch_index_1))
+        last_by_time_2 = (current_time + (mult * catch_index_2))
+        for _ in range(10):
+            item = {"valuesssssss": random.uniform(0, 12), "time": (current_time + (mult * super_index))}
+            many_list.append(item)
+            super_index += 1
+        
+        sample_env_handler.save_many(many_list)
         latest = sample_env_handler.last()
+        last_by = sample_env_handler.last_by(last_by_time, ar="relative")
+        last_by_2 = sample_env_handler.last_by(last_by_time_2, ar="relative")
+        
+
+        t1 = last_by.get('time', time.time())
+        t2 = last_by_2.get('time', time.time())
+        
         logger.info(latest)
+        logger.info(magenta(last_by_time, bold=True))
+        logger.success(t1)
+        logger.error(t2)
+        logger.info(cyan(t1-t2, bold=True))
 
 
 if __name__ == "__main__":

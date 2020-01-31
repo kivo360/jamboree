@@ -12,7 +12,7 @@ from multiprocessing import cpu_count
 from crayons import green, yellow
 from loguru import logger
 import random
-from jamboree.storage.databases import MongoDatabaseConnection, ZRedisDatabaseConnection
+from jamboree.storage.databases import MongoDatabaseConnection, RedisDatabaseConnection
 
 
 class EventProcessor(ABC):
@@ -56,9 +56,9 @@ class Jamboree(EventProcessor):
     def __init__(self, mongodb_host="localhost", redis_host="localhost", redis_port=6379):
         self.redis = Redis(redis_host, port=redis_port)
         self.store = Store(mongodb_host).create_lib('events').get_store()['events']
-        self.pool = ThreadPool(max_workers=cpu_count() * 6)
+        self.pool = ThreadPool(max_workers=cpu_count() * 4)
         self.mongo_conn = MongoDatabaseConnection()
-        self.redis_conn = ZRedisDatabaseConnection()
+        self.redis_conn = RedisDatabaseConnection()
         self.mongo_conn.connection = self.store
         self.redis_conn.connection = self.redis
         # self.redis_conn.pool = self.pool
@@ -155,6 +155,10 @@ class Jamboree(EventProcessor):
         self.pool.schedule(self.redis_conn.delete_all, args=(query))
 
     def _remove_first_redis(self, _hash, query: dict):
+        # rlock = f"{_hash}:lock"
+        # with self.redis.lock(rlock):
+        #     push_key = f"{_hash}:list"
+        #     self.redis.rpop(push_key)
         pass
 
     def remove_first(self, query: dict):
@@ -179,9 +183,11 @@ class Jamboree(EventProcessor):
             # Log a warning here instead
             return
 
-        if len(data) == 0: return
+        if len(data) == 0:
+            return
 
-        self._bulk_save(query, data)
+        for item in data:
+            self._save(query, item)
 
     def bulk_upsert_redis(self, query, data):
         logger.info("Default retcon redis")
@@ -193,6 +199,21 @@ class Jamboree(EventProcessor):
         self.redis_conn.save_many(query, data)
         self.pool.schedule(self.mongo_conn.save_many, args=(query, data))
 
+    def _save_redis(self, _hash: str, data: dict):
+
+        serialized = orjson.dumps(data)
+        rlock = f"{_hash}:lock"
+        with self.redis.lock(rlock):
+            push_key = f"{_hash}:list"
+            self.redis.rpush(push_key, serialized)
+
+    def _bulk_save_redis(self, _hash: str, data: list):
+        serialized_list = [orjson.dumps(x) for x in data]
+
+        rlock = f"{_hash}:lock"
+        with self.redis.lock(rlock):
+            push_key = f"{_hash}:list"
+            self.redis.rpush(push_key, *serialized_list)
 
     def _pop_redis_multiple(self, _hash, limit: int):
         rlock = f"{_hash}:lock"
@@ -233,19 +254,25 @@ class Jamboree(EventProcessor):
 
     def query_direct_latest(self, query):
         """ Queries from mongodb directly. Used to search extremely large queries. """
-        return self.mongo_conn.query_latest(query)
+        latest_items = list(self.store.query_latest(query))
+        if len(latest_items) > 0:
+            return latest_items[0]
+        return {}
 
-    def get_latest(self, query, abs_rel="absolute"):
+    def get_latest(self, query):
         """ Gets the latest query"""
         # Add a conditional time lock
         _hash = self._generate_hash(query)
-        count, database = self._get_count(_hash, query)
-        if count > 0 and database == "redis":
-            return self.redis_conn.query_latest(query, abs_rel)
+        count = self._get_count(_hash, query)
+        if count > 0:
+            return self.back_to_dict(self.redis.lrange(f"{_hash}:list", -1, -1))
         # Mongo, slowdown
-        return self.mongo_conn.query_latest(query)
+        latest_items = list(self.store.query_latest(query))
+        if len(latest_items) > 0:
+            return latest_items[0]
+        return {}
 
-    def get_latest_many(self, query: dict, limit=1000, abs_rel="absolute"):
+    def get_latest_many(self, query: dict, limit=1000):
 
         if self._validate_query(query) == False: return []
         _hash = self._generate_hash(query)
@@ -282,17 +309,18 @@ class Jamboree(EventProcessor):
 
     def _get_count(self, _hash: str, query: dict):
         # Checks to see if a count already exist in redis, if not, check for a count in mongo.
-        count = self.redis_conn.count(_hash)
+        _count_hash = f"{_hash}:list"
+        count = self.redis.llen(_count_hash)
         if count is not None:
-            return count, "redis"
+            return count
 
         records = list(self.store.query(query))
         record_len = len(records)
-        return record_len, "mongo"
+        return record_len
 
     def count(self, query):
         """ """
         if self._validate_query(query) == False: return []
         _hash = self._generate_hash(query)
-        count, database = self._get_count(_hash, query)
+        count = self._get_count(_hash, query)
         return count

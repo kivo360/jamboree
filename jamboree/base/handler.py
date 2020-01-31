@@ -1,10 +1,10 @@
 from abc import ABC, ABCMeta
-from typing import Dict, Any, List
 import copy
 
+from typing import Dict, Any, List
 from loguru import logger
-from .main import EventProcessor
 from crayons import red
+from .processor import EventProcessor
 
 
 class BaseHandler(object, metaclass=ABCMeta):
@@ -62,9 +62,6 @@ class DBHandler(BaseHandler):
 
     def __setitem__(self, key, value):
         if bool(self.required):
-            # print(key)
-            # print(self.required)
-            # print(value)
             if key in self.required:
                 self._query[key] = value
                 return self._query

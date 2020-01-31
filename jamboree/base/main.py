@@ -112,9 +112,10 @@ class Jamboree(EventProcessor):
 
     def _save(self, query: dict, data: dict):
         """
-            Given a type (data entity), data and a epoch for time (utc time only), save the data in both redis and mongo. 
-            Does it in a background process. Use with add event.
-            We save the information both in mongodb and redis. We assume there's many of each collection. We find a specific collection using the query.
+            - Given a type (data entity), data and a epoch for time (utc time only), save the data in both redis and mongo. 
+            - Does it in a background process. Use with add event.
+            - We save the information both in mongodb and redis. We assume there's many of each collection. 
+                - We find a specific collection using the query.
         """
         if self._validate_query(query) == False:
             # Log a warning here instead

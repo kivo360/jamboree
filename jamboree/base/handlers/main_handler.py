@@ -2,52 +2,19 @@ import copy
 from abc import ABC, ABCMeta
 from typing import Dict, Any, List
 
-from jamboree.base.main import EventProcessor
+from loguru import logger
+from crayons import red
+from jamboree.base.processor import EventProcessor
+from jamboree.base.handlers.base import BaseHandler
+from jamboree.utils.helper import Helpers
 
-
-class BaseHandler(object, metaclass=ABCMeta):
-    """ 
-        A way to handle reads and writes consistently without having to write every single variable:
-    """
-
-    def __init__(self):
-        pass
-
-    def check(self):
-        raise NotImplementedError
-
-    def save(self, data: dict):
-        raise NotImplementedError
-
-    def _bulk_save(self, query: dict, data: list):
-        raise NotImplementedError
-
-    def _get_many(self):
-        raise NotImplementedError
-
-    def last(self):
-        raise NotImplementedError
-
-    def many(self, limit: int = 100):
-        raise NotImplementedError
-
-    def save_many(self, query: dict, data: list):
-        raise NotImplementedError
-
-    def pop_multiple(self, query, _limit: int = 1):
-        raise NotImplementedError
-
-    def swap(self, query, alt: dict = {}):
-        """ Swap betwen the first and last item """
-        raise NotImplementedError
-
-    def query_mix(self, query: dict, alt: dict = {}):
-        raise NotImplementedError
 
 
 class DBHandler(BaseHandler):
     """ 
-        A way to handle reads and writes consistently without having to write every single variable:
+        A simple event store using a variation of databases.
+        ---
+        Currently uses zadd to work
     """
 
     def __init__(self):
@@ -57,6 +24,8 @@ class DBHandler(BaseHandler):
         self._query = {}
         self.data = {}
         self.event_proc = None
+        self.main_helper = Helpers()
+        self._is_event = False
 
     def __setitem__(self, key, value):
         if bool(self.required):
@@ -76,6 +45,24 @@ class DBHandler(BaseHandler):
             if key in self.data.keys():
                 return self.data.get(key, None)
         return None
+    
+    def setup_query(self, alt={}):
+        query = copy.copy(self._query)
+        query['type'] = self.entity
+        query.update(alt)
+        query.update(self.data)
+        return query
+
+
+    @property
+    def is_event(self) -> bool:
+        """ Determines if we're going to add event ids to what we're doing. We can essentially set certain conditions"""
+        return self._is_event
+    
+    @is_event.setter
+    def is_event(self, is_true:bool=False):
+        self._is_event = is_true
+
 
     @property
     def event(self):
@@ -127,96 +114,105 @@ class DBHandler(BaseHandler):
                 raise AttributeError(f"{req} is not a {_type}")
         return True
 
-    def save(self, data: dict, alt={}):
-        self.check()
+    
 
-        query = copy.copy(self._query)
-        query['type'] = self.entity
-        query.update(alt)
-        query.update(self.data)
-        self.event_proc.save(query, data)
-
-    def save_many(self, data: list, alt={}):
-        self.check()
-
-        query = copy.copy(self._query)
-        query['type'] = self.entity
-        # logger.info(query)
-        query.update(alt)
-        query.update(self.data)
-        self.event_proc._bulk_save(query, data)
-
-    def _get_many(self, limit: int, alt={}):
+    def _get_many(self, limit: int, ar:str, alt={}):
         """ Aims to get many variables """
-        self.check()
-        query = copy.copy(self._query)
-        query['type'] = self.entity
-        query.update(alt)
-        query.update(self.data)
-        latest_many = self.event_proc.get_latest_many(query, limit=limit)
+        query = self.setup_query(alt)
+        latest_many = self.event_proc.get_latest_many(query, abs_rel=ar, limit=limit)
         return latest_many
 
-    def _get_latest(self, alt={}):
-        self.check()
-        query = copy.copy(self._query)
-        query['type'] = self.entity
-        query.update(alt)
-        query.update(self.data)
-        latest = self.event_proc.get_latest(query)
+    def _get_latest(self, ar, alt={}):
+        query = self.setup_query(alt)
+        latest = self.event_proc.get_latest(query, abs_rel="absolute")
         return latest
 
-    def last(self, alt={}):
-        alt.update(self.data)
-        return self._get_latest(alt)
 
-    def many(self, limit=1000, alt={}):
+    def _last_by(self, time_index:float, ar="absolute", alt={}) -> dict:
+        query = self.setup_query(alt)
+        return self.event_proc.get_latest_by(query, time_index, abs_rel=ar)
+
+
+    def _in_between(self, min_epoch:float, max_epoch:float, ar:str="absolute", alt={}):
+        query = self.setup_query(alt)
+        return self.event_proc.get_between(query, min_epoch, max_epoch, abs_rel=ar)
+
+
+    def save(self, data: dict, alt={}):
+        self.check()
+        query = self.setup_query(alt)
+        event = self.main_helper.add_event_id(data)
+        self.event_proc.save(query, event)
+
+    def save_many(self, data: list, ar="absolute", alt={}):
+        self.check()
+        if not self.main_helper.is_abs_rel(ar): return
+        query = self.setup_query(alt)
+        events = self.main_helper.add_event_ids(data)
+        self.event_proc.save_many(query, events)
+
+
+    def last(self, ar="absolute", alt={}):
+        self.check()
+        if not self.main_helper.is_abs_rel(ar): return {}
         alt.update(self.data)
-        return self._get_many(limit, alt=alt)
+        return self._get_latest(ar=ar, alt=alt)
+
+    
+    def many(self, limit=1000, ar="absolute", alt={}):
+        self.check()
+        if not self.main_helper.is_abs_rel(ar): return []
+        alt.update(self.data)
+        return self._get_many(limit, ar, alt=alt)
+
 
     def pop(self, alt={}):
-        query = copy.copy(self._query)
-        query['type'] = self.entity
-        query.update(alt)
-        query.update(self.data)
+        self.check()
+        query = self.setup_query(alt)
         self.event_proc.remove_first(query)
 
+
     def pop_many(self, _limit, alt={}):
-        query = copy.copy(self._query)
-        query['type'] = self.entity
-        query.update(alt)
-        query.update(self.data)
+        self.check()
+        query = self.setup_query(alt)
         return self.event_proc.pop_multiple(query, _limit)
+
+
+    
+    def last_by(self, time_index:float, ar="absolute", alt={}):
+        self.check()
+        if not self.main_helper.is_abs_rel(ar): return {}
+        item = self._last_by(time_index, ar=ar, alt=alt)
+        return item    
+
+
+    def in_between(self, min_epoch:float, max_epoch:float, ar:str="absolute", alt={}):
+        self.check()
+        if not self.main_helper.is_abs_rel(ar): return []
+        items = self._in_between(min_epoch, max_epoch, ar=ar, alt=alt)
+        return items
+
+
 
     def count(self, alt={}):
         """ Aims to get many variables """
         self.check()
-        query = copy.copy(self._query)
-        query['type'] = self.entity
-        query.update(alt)
-        query.update(self.data)
+        query = self.setup_query(alt)
         return self.event_proc.count(query)
+    
 
-    def swap_many(self, limit: int = 10, alt={}):
-        """ Move items from the main list to a swapped list. """
+    def get_single(self, alt={}):
         self.check()
-        query = copy.copy(self._query)
-        query['type'] = self.entity
-        query.update(alt)
-        query.update(self.data)
-        return self.event_proc.multi_swap(query, limit)
+        query = self.setup_query(alt)
+        item = self.event_proc.single_get(query)
+        return item
 
-    def query_mix(self, limit: int = 10, alt: dict = {}):
+    def set_single(self, data:dict, alt={}):
         self.check()
-        query = copy.copy(self._query)
-        query['type'] = self.entity
-        query.update(alt)
-        query.update(self.data)
-        return self.event_proc.query_mix(query, limit)
+        query = self.setup_query(alt)
+        self.event_proc.single_set(query, data)
 
-    def query_many_swap(self, limit: int = 10, alt: dict = {}):
+    def delete_single(self, alt={}):
         self.check()
-        query = copy.copy(self._query)
-        query['type'] = self.entity
-        query.update(alt)
-        query.update(self.data)
-        return self.event_proc.get_latest_many_swap(query, limit)
+        query = self.setup_query(alt)
+        self.event_proc.single_delete(query)
