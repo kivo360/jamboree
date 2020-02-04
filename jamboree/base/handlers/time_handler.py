@@ -18,7 +18,6 @@ class TimeHandler(DBHandler):
         self.required = {
             "episode": str,
             "live": bool,
-            "sub_detail": str
         }
         self.micro = 1000
         self.seconds = 0
@@ -26,12 +25,18 @@ class TimeHandler(DBHandler):
         self.hours = 10
         self.days = 0
         self.weeks = 0
-        self._head = time.time()
-        
 
+        self.step_micro = 1000
+        self.step_seconds = 0
+        self.step_minutes = 0
+        self.step_hours = 10
+        self.step_days = 0
+        self.step_weeks = 0
+
+        self._head = time.time()
+    
     @property
-    def lookback_params(self):
-        self.load_lookback()
+    def looks(self):
         lookback_dict = {
             "microseconds": self.micro,
             "seconds":self.seconds,
@@ -43,6 +48,30 @@ class TimeHandler(DBHandler):
         return lookback_dict
 
     @property
+    def steps(self):
+        stepsize_dict = {
+            "microseconds": self.step_micro,
+            "seconds":self.step_seconds,
+            "minutes":self.step_minutes,
+            "hours":self.step_hours,
+            "days":self.step_days,
+            "weeks":self.step_weeks
+        }
+        return stepsize_dict
+
+    @property
+    def lookback_params(self):
+        self.load_lookback()
+        lookback_dict = self.looks
+        return lookback_dict
+
+    @property
+    def stepsize_params(self):
+        self.load_stepsize()
+        stepsize_dict = self.steps
+        return stepsize_dict
+
+    @property
     def head(self):
         self.load_head()
         return self._head
@@ -52,11 +81,17 @@ class TimeHandler(DBHandler):
         self._head = _head
         self.save_head()
 
+    @property
+    def tail(self):
+        head = self.head
+        look_params = self.lookback_params
+        tail = maya.MayaDT(head).subtract(**look_params)
+        return tail._epoch
     
 
     
 
-    def lookback(self, microseconds=1000, seconds=0, minutes=0, hours=10, days=0, weeks=0):
+    def change_lookback(self, microseconds=1000, seconds=0, minutes=0, hours=10, days=0, weeks=0):
         self.load_lookback()
         if microseconds != 1000:
             self.micro = microseconds
@@ -71,7 +106,26 @@ class TimeHandler(DBHandler):
         if weeks != 0:
             self.weeks = weeks
         
+
         self.save_lookback()
+    
+
+    def change_stepsize(self, microseconds=1000, seconds=0, minutes=0, hours=10, days=0, weeks=0):
+        self.load_stepsize()
+        if microseconds != 1000:
+            self.step_micro = microseconds
+        if seconds != 0:
+            self.step_seconds = seconds
+        if minutes != 0:
+            self.step_minutes = minutes
+        if hours != 10:
+            self.step_hours = hours
+        if days != 0:
+            self.step_days = days
+        if weeks != 0:
+            self.step_weeks = weeks
+        
+        self.save_stepsize()
 
     """ 
         # Index Commands
@@ -120,7 +174,34 @@ class TimeHandler(DBHandler):
     def save_lookback(self):
         """ Save monitored assets """
         alt = {"detail": "lookback"}
-        self.save(self.lookback_params, alt=alt)
+        params = self.looks
+        self.save(params, alt=alt)
+    
+
+
+
+
+    def count_stepsize(self) -> int:
+        alt = {"detail": "stepsize"}
+        lookback_count = self.count(alt=alt)
+        return lookback_count
+
+
+    def latest_stepsize(self) -> dict:
+        alt = {"detail": "stepsize"}
+        lookback = self.last(alt=alt)
+        return lookback
+
+
+    def save_stepsize(self):
+        """ Save monitored assets """
+        alt = {"detail": "stepsize"}
+        self.save(self.steps, alt=alt)
+
+
+
+
+
     
     def load_lookback(self):
         count = self.count_lookback()
@@ -132,6 +213,17 @@ class TimeHandler(DBHandler):
             self.hours = look.get('hours', 10)
             self.days = look.get('days', 0)
             self.weeks = look.get('weeks', 0)
+    
+    def load_stepsize(self):
+        count = self.count_stepsize()
+        if count > 0:
+            look = self.latest_stepsize()
+            self.step_micro = look.get('microseconds', 1000)
+            self.step_seconds = look.get('seconds', 0)
+            self.step_minutes = look.get('minutes', 0)
+            self.step_hours = look.get('hours', 10)
+            self.step_days = look.get('days', 0)
+            self.step_weeks = look.get('weeks', 0)
     
     def load_head(self):
         if self.count_headindex() > 0:
@@ -152,6 +244,17 @@ class TimeHandler(DBHandler):
         self._reset_lookback()
         self._reset_headindex()
     
+    def step(self):
+        head = self.head
+        step_params = self.stepsize_params
+        self.head = maya.MayaDT(head).add(**step_params)._epoch
+        self.save_head()
+    
+    def step_back(self):
+        head = self.head
+        step_params = self.stepsize_params
+        self.head = maya.MayaDT(head).subtract(**step_params)._epoch
+        self.save_head()
     
 
 
@@ -161,7 +264,6 @@ if __name__ == "__main__":
     timehandler.event = jambo
     timehandler["episode"] = uuid.uuid4().hex
     timehandler["live"] = False
-    timehandler['sub_detail'] = "whore"
     timehandler.reset()
     print(maya.MayaDT(timehandler.head))
     timehandler.head = maya.now().subtract(weeks=3, days=9)._epoch

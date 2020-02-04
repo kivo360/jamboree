@@ -259,7 +259,7 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
 
         
         _current_key = self.helpers.dynamic_key(_hash, abs_rel)
-        logger.info(yellow(_current_key))
+        # logger.info(yellow(_current_key))
         keys = self.connection.zrange(_current_key, -1, -1, withscores=True)
         if len(keys) == 0: return {}
         combined = self.helpers.combined_abs_rel(keys, abs_rel=abs_rel)

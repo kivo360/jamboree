@@ -25,7 +25,7 @@ class DBHandler(BaseHandler):
         self.data = {}
         self.event_proc = None
         self.main_helper = Helpers()
-        self._is_event = False
+        self._is_event = True
 
     def __setitem__(self, key, value):
         if bool(self.required):
@@ -141,15 +141,17 @@ class DBHandler(BaseHandler):
     def save(self, data: dict, alt={}):
         self.check()
         query = self.setup_query(alt)
-        event = self.main_helper.add_event_id(data)
-        self.event_proc.save(query, event)
+        if self.is_event:
+            data = self.main_helper.add_event_id(data)
+        self.event_proc.save(query, data)
 
     def save_many(self, data: list, ar="absolute", alt={}):
         self.check()
         if not self.main_helper.is_abs_rel(ar): return
         query = self.setup_query(alt)
-        events = self.main_helper.add_event_ids(data)
-        self.event_proc.save_many(query, events)
+        if self.is_event:
+            data = self.main_helper.add_event_ids(data)
+        self.event_proc.save_many(query, data)
 
 
     def last(self, ar="absolute", alt={}):

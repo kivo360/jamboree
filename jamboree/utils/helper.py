@@ -22,6 +22,13 @@ class Helpers(object):
         _hash = base64.b64encode(str.encode(_hash))
         _hash = _hash.decode('utf-8')
         return _hash
+    
+    def hash_to_dict(self, _hash:str) -> str:
+        # TODO: Convert Hash To Dict
+        # NOTE: Not tested. Please make sure to test it
+        __hash = base64.b64decode(_hash).decode('utf-8')
+        _hash_json = ujson.loads(__hash)
+        return _hash_json
 
     def add_time(self, item: dict, _time: float, rel_abs="absolute"):
         if rel_abs == "absolute":
@@ -286,3 +293,46 @@ class Helpers(object):
             item_json['time'] = float(key) * 0.001
             converted_list.append(item_json)
         return converted_list
+    
+
+    def convert_to_storable_no_json(self, json_string:str) -> list:
+        converted_list = []
+        for key, value in orjson.loads(json_string).items():
+            item_json = value
+            item_json['time'] = float(key) * 0.001
+            converted_list.append(item_json)
+        return converted_list
+    
+    def convert_dataframe_to_storable_item_list(self, df:pd.DataFrame) -> list:
+        data_json = df.to_json(orient='index')
+        value = self.convert_to_storable_no_json(data_json)
+        return value
+    
+
+    def standardize_record(self, record):
+        closing_record = copy(record)
+        if "Close" in record:
+            closing_record.pop("Close", None)
+            closing_record['close'] = record["Close"]
+        if "Open" in record:
+            closing_record.pop("Open", None)
+            closing_record['open'] = record["Open"]
+        if "Low" in record:
+            closing_record.pop("Low", None)
+            closing_record['low'] = record["Low"]
+        if "High" in record:
+            closing_record.pop("High", None)
+            closing_record['high'] = record["High"]
+        if "Volume" in record:
+            closing_record.pop("Volume", None)
+            closing_record['volume'] = record["Volume"]
+        if "Adj Close" in record:
+            closing_record.pop("Adj Close", None)
+            closing_record['adj_close'] = record["Adj Close"]
+        return closing_record
+    
+    def standardize_outputs(self, records:List[Dict[str, Any]]):
+        if len(records) == 0:
+            return []
+        _records = [self.standardize_record(rec) for rec in records]
+        return _records
