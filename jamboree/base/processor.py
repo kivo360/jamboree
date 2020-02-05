@@ -10,7 +10,7 @@ class EventProcessor(ABC):
         raise NotImplementedError    
 
 
-    def get_latest(self, query, abs_rel="absolute"):
+    def get_latest(self, query, abs_rel="absolute") -> dict:
         raise NotImplementedError
 
 
@@ -26,7 +26,7 @@ class EventProcessor(ABC):
         raise NotImplementedError
 
 
-    def count(self, query: dict):
+    def count(self, query: dict) -> int:
         raise NotImplementedError
 
 

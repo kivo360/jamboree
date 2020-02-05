@@ -1,8 +1,9 @@
+from loguru import logger
 import maya
 import uuid
 import pandas as pd
 
-
+from crayons import magenta
 from jamboree import Jamboree
 from jamboree.base.handlers.time_handler import TimeHandler
 from jamboree.base.handlers.main_handler import DBHandler
@@ -71,6 +72,19 @@ class DataHandler(DBHandler):
         self._meta.subcategories = self['subcategories']
         self._meta.name = self['name']
         return self._meta
+    
+    @property
+    def is_next(self) -> bool:
+        """ A boolean that determines if there's anything next """
+        
+        next_data = self.previous_head()
+        next_keys = list(next_data.keys())
+        # logger.info(magenta(next_data.keys(), bold=True))
+        
+        # head = self.close_head()
+        if len(next_keys) == 0:
+            return False
+        return True
 
 
     def _timestamp_resample_and_drop(self, frame: pd.DataFrame, resample_size="D"):
@@ -91,7 +105,7 @@ class DataHandler(DBHandler):
         if is_bar == True:
             storable_list = self.main_helper.standardize_outputs(storable_list)
         self.save_many(storable_list)
-    
+
     def dataframe_from_head(self):
         """ Get a dataframe between a head and tail. Resample according to our settings"""
         head = self.time.head
@@ -104,6 +118,12 @@ class DataHandler(DBHandler):
     def close_head(self):
         """ Get the closest information at the given head"""
         head = self.time.head
+        closest = self.last_by(head, ar="relative")
+        return closest
+    
+    def previous_head(self):
+        """ Get the closest information at the given head"""
+        head = self.time.peak_back()
         closest = self.last_by(head, ar="relative")
         return closest
 
@@ -136,9 +156,8 @@ if __name__ == "__main__":
     data_hander.time.head = maya.now().subtract(weeks=200, hours=14)._epoch
     data_hander.time.change_stepsize(microseconds=0, days=1, hours=0)
     data_hander.time.change_lookback(microseconds=0, weeks=4, hours=0)
-
     
-
-    for i in range(800):
+    while data_hander.is_next:
+        # logger.info(magenta(, bold=True))
         print(data_hander.dataframe_from_head())
         data_hander.time.step()

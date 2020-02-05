@@ -244,13 +244,55 @@ class TimeHandler(DBHandler):
         self._reset_lookback()
         self._reset_headindex()
     
-    def step(self):
+    def step(self) -> None:
         head = self.head
         step_params = self.stepsize_params
         self.head = maya.MayaDT(head).add(**step_params)._epoch
         self.save_head()
     
-    def step_back(self):
+    def peak(self) -> float:
+        """ Get the time exactly one step ahead"""
+        head = self.head
+        step_params = self.stepsize_params
+        new_head = maya.MayaDT(head).add(**step_params)._epoch
+        return new_head
+
+    
+    def peak_far(self) -> float:
+        """ 
+            # PEAK FAR
+            ---
+            Peak far into the future. One step head + one lookahead_params 
+
+            Doesn't modify the head
+        """
+        head = self.head
+        step_params = self.stepsize_params
+        lookahead_params = self.lookback_params
+        new_head = maya.MayaDT(head).add(**step_params).add(**lookahead_params)._epoch
+        return new_head
+
+    def peak_back(self) -> float:
+        head = self.head
+        step_params = self.stepsize_params
+        new_head = maya.MayaDT(head).subtract(**step_params)._epoch
+        return new_head
+    
+
+
+    def peak_back_far(self) -> float:
+        """ 
+            # PEAK FAR
+            ---
+            Peak far into the future. One step head + one lookahead_params 
+        """
+        head = self.head
+        step_params = self.stepsize_params
+        lookahead_params = self.lookback_params
+        new_head = maya.MayaDT(head).subtract(**step_params).subtract(**lookahead_params)._epoch
+        return new_head
+    
+    def step_back(self) -> None:
         head = self.head
         step_params = self.stepsize_params
         self.head = maya.MayaDT(head).subtract(**step_params)._epoch

@@ -1,7 +1,6 @@
 import copy
 from abc import ABC, ABCMeta
 from typing import Dict, Any, List
-
 from loguru import logger
 from crayons import red
 from jamboree.base.processor import EventProcessor
@@ -63,7 +62,6 @@ class DBHandler(BaseHandler):
     def is_event(self, is_true:bool=False):
         self._is_event = is_true
 
-
     @property
     def event(self):
         return self.event_proc
@@ -72,6 +70,9 @@ class DBHandler(BaseHandler):
     def event(self, _event: EventProcessor):
         # Use to process event
         self.event_proc = _event
+    
+    def clear_event(self) -> None:
+        self.event_proc = None
 
     @property
     def entity(self):
@@ -196,7 +197,7 @@ class DBHandler(BaseHandler):
 
 
 
-    def count(self, alt={}):
+    def count(self, alt={}) -> int:
         """ Aims to get many variables """
         self.check()
         query = self.setup_query(alt)
@@ -218,3 +219,31 @@ class DBHandler(BaseHandler):
         self.check()
         query = self.setup_query(alt)
         self.event_proc.single_delete(query)
+    
+    def copy(self):
+        """ Get everything about this DBHandler without the event inside """
+        _event = self.event
+        self.clear_event()
+        copied = copy.deepcopy(self)
+        self.event = _event
+        return copied
+    
+    def __str__(self) -> str:
+        """ 
+            self._entity = ""
+            self._required = {}
+            self._query = {}
+            self.data = {}
+            self.event_proc = None
+            self.main_helper = Helpers()
+            self._is_event = True
+        """
+        total_dict = {
+            "entity": self._entity,
+            "required": self._required,
+            "query": self._query,
+            "data": self.data,
+            "is_event": self._is_event
+        }
+        rhash = self.main_helper.generate_hash(total_dict)
+        return rhash

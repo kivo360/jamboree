@@ -17,7 +17,7 @@ class Helpers(object):
     def __init__(self) -> None:
         pass
 
-    def generate_hash(self, query: dict):
+    def generate_hash(self, query: dict) -> str:
         _hash = ujson.dumps(query, sort_keys=True)
         _hash = base64.b64encode(str.encode(_hash))
         _hash = _hash.decode('utf-8')
