@@ -5,6 +5,7 @@ from copy import deepcopy
 import ujson
 import json
 import uuid
+import pprint
 from typing import List, Dict, Any
 from jamboree.base.handlers.main_handler import DBHandler
 from jamboree.base.handlers.data_handler import DataHandler
@@ -92,13 +93,7 @@ class MultiDataManagement(DBHandler):
         self._time['live'] = self.live
         return self._time
     
-    def sync(self):
-        """ Gets all of the datahandlers and synchronize their time object """
-        if len(self.datasets) > 0:
-            for data in self.datasets:
-                data.time = self.time
-                data.live = self.live
-                data.episode = self.episode
+    
 
     def is_next(self) -> bool:
         """ Determine if anything is next in the head"""
@@ -255,17 +250,48 @@ class MultiDataManagement(DBHandler):
         """ Initialize with a nil set of data if nothing exist yet"""
         if self.count_dataset_list() == 0:
             self.add_multiple_data_sources([], allow_bypass=True)
+    
+    def reset_datasets(self):
+        pass
 
     def reset(self):
         """ Reset the data we're querying for. """
         self._load_dataset_list()
         self._reset_dataset_list()
+        self.time.reset()
+        self.sync()
 
 
 
-    def print_times(self):
-        for data in self.datasets:
-            print(data.time)
+    def step(self, call_type:str="dataframe"):
+        avail_types = ["dataframe", "current"]
+        if call_type not in avail_types:
+            call_type = "dataframe"
+        
+        data_set = {
+            
+        }
+
+        for dataset in self.datasets:
+            dataset_name  = str(dataset)
+            dataset.event = self.event
+            if call_type == "dataframe":
+                data_set[dataset_name] = dataset.dataframe_from_head()
+            else:
+                data_set[dataset_name] = dataset.closest_head()
+        self.time.step()
+        self.sync()
+        return data_set
+    
+
+    def sync(self):
+        """ Gets all of the datahandlers and synchronize their time object """
+        if len(self.datasets) > 0:
+            for data in self.datasets:
+                data.time = self.time
+                data.live = self.live
+                data.episode = self.episode
+    
 
 
 
@@ -277,6 +303,7 @@ if __name__ == "__main__":
         multi_data = MultiDataManagement()
         multi_data["set_name"] = set_name
         multi_data.event = jam
+        multi_data.episode = uuid.uuid4().hex
         multi_data.reset()
         dset1 = {
             "name": "shaw",
@@ -321,6 +348,10 @@ if __name__ == "__main__":
         full_set = [dset1, dset2, dset3, dset4]
         multi_data.add_multiple_data_sources(full_set)
         # Check to make sure we aren't adding any dummy sources
+        multi_data.time.head = maya.now().subtract(weeks=200, hours=14)._epoch
+        multi_data.time.change_stepsize(microseconds=0, days=1, hours=0)
+        multi_data.time.change_lookback(microseconds=0, weeks=4, hours=0)
         multi_data.sync()
         for _ in range(1000):
-            print(len(multi_data.sources))
+            pprint.pprint(multi_data.step("current"))
+            print("\n\n")

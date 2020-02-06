@@ -1,16 +1,20 @@
-from loguru import logger
-import maya
 import uuid
-import pandas as pd
-
-from crayons import magenta
-from jamboree import Jamboree
-from jamboree.base.handlers.time_handler import TimeHandler
-from jamboree.base.handlers.main_handler import DBHandler
-from jamboree.base.handlers.metadata_handler import MetaHandler
-import pandas_datareader.data as web
 # from pandas import Series, DataFrame, Timestamp
 from pprint import pprint
+
+import maya
+import pandas as pd
+import pandas_datareader.data as web
+import ujson
+
+# from crayons import magenta
+# from loguru import logger
+
+from jamboree import Jamboree
+from jamboree.base.handlers.main_handler import DBHandler
+from jamboree.base.handlers.metadata_handler import MetaHandler
+from jamboree.base.handlers.time_handler import TimeHandler
+
 
 class DataHandler(DBHandler):
     """ 
@@ -81,7 +85,7 @@ class DataHandler(DBHandler):
     def is_next(self) -> bool:
         """ A boolean that determines if there's anything next """
         
-        next_data = self.close_head()
+        next_data = self.closest_head()
         next_keys = list(next_data.keys())
         if len(next_keys) == 0:
             return False
@@ -116,10 +120,14 @@ class DataHandler(DBHandler):
         frame = self._timestamp_resample_and_drop(frame)
         return frame
     
-    def close_head(self):
+    def closest_head(self):
         """ Get the closest information at the given head"""
         head = self.time.head
         closest = self.last_by(head, ar="relative")
+        closest.pop("name")
+        closest.pop("category")
+        closest.pop("subcategories")
+        closest.pop("type")
         return closest
     
     def previous_head(self):
@@ -132,6 +140,13 @@ class DataHandler(DBHandler):
         """ Reset the data we're querying for. """
         self.metadata.reset()
         self.time.reset()
+    
+    def __str__(self) -> str:
+        name = self["name"]
+        category = self["category"]
+        subcategories = self["subcategories"]
+        jscat = self.main_helper.generate_hash(subcategories)
+        return f"{name}:{category}:{jscat}"
 
     
 if __name__ == "__main__":
