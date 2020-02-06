@@ -3,6 +3,7 @@ from abc import ABC, ABCMeta
 from typing import Dict, Any, List
 from loguru import logger
 from crayons import red
+import ujson
 from jamboree.base.processor import EventProcessor
 from jamboree.base.handlers.base import BaseHandler
 from jamboree.utils.helper import Helpers
@@ -228,22 +229,22 @@ class DBHandler(BaseHandler):
         self.event = _event
         return copied
     
-    def __str__(self) -> str:
-        """ 
-            self._entity = ""
-            self._required = {}
-            self._query = {}
-            self.data = {}
-            self.event_proc = None
-            self.main_helper = Helpers()
-            self._is_event = True
-        """
-        total_dict = {
-            "entity": self._entity,
-            "required": self._required,
-            "query": self._query,
-            "data": self.data,
-            "is_event": self._is_event
-        }
-        rhash = self.main_helper.generate_hash(total_dict)
-        return rhash
+    # def __str__(self) -> str:
+    #     """ 
+    #         self._entity = ""
+    #         self._required = {}
+    #         self._query = {}
+    #         self.data = {}
+    #         self.event_proc = None
+    #         self.main_helper = Helpers()
+    #         self._is_event = True
+    #     """
+    #     total_dict = {
+    #         "entity": self._entity,
+    #         "required": self._required,
+    #         "query": self._query,
+    #         "data": self.data,
+    #         "is_event": self._is_event
+    #     }
+    #     rhash = self.main_helper.generate_hash(total_dict)
+    #     return rhash

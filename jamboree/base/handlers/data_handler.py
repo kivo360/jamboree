@@ -65,6 +65,10 @@ class DataHandler(DBHandler):
         self._time['live'] = self.live
         return self._time
     
+    @time.setter
+    def time(self, _time:'TimeHandler'):
+        self._time = self.time
+    
     @property
     def metadata(self):
         self._meta.event = self.event
@@ -77,11 +81,8 @@ class DataHandler(DBHandler):
     def is_next(self) -> bool:
         """ A boolean that determines if there's anything next """
         
-        next_data = self.previous_head()
+        next_data = self.close_head()
         next_keys = list(next_data.keys())
-        # logger.info(magenta(next_data.keys(), bold=True))
-        
-        # head = self.close_head()
         if len(next_keys) == 0:
             return False
         return True
@@ -134,7 +135,8 @@ class DataHandler(DBHandler):
 
     
 if __name__ == "__main__":
-    # data = web.DataReader('MSFT','yahoo',start='2010/1/1',end='2020/1/30').round(2)
+    data_msft = web.DataReader('MSFT','yahoo',start='2010/1/1',end='2020/1/30').round(2)
+    data_apple = web.DataReader('AAPL','yahoo',start='2010/1/1',end='2020/1/30').round(2)
 
     episode_id = uuid.uuid4().hex
     jambo = Jamboree()
@@ -147,16 +149,20 @@ if __name__ == "__main__":
     data_hander['subcategories'] = {
         "market": "stock",
         "country": "US",
-        "sector": "techologyy"
+        "sector": "techologyyy"
     }
     data_hander['name'] = "MSFT"
     data_hander.reset()
-    # data_hander.store_time_df(data, is_bar=True)
+    data_hander.store_time_df(data_msft, is_bar=True)
+
+
+    data_hander['name'] = "AAPL"
+    data_hander.store_time_df(data_apple, is_bar=True)
 
     data_hander.time.head = maya.now().subtract(weeks=200, hours=14)._epoch
     data_hander.time.change_stepsize(microseconds=0, days=1, hours=0)
     data_hander.time.change_lookback(microseconds=0, weeks=4, hours=0)
-    
+
     while data_hander.is_next:
         # logger.info(magenta(, bold=True))
         print(data_hander.dataframe_from_head())

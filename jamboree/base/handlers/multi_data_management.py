@@ -2,12 +2,13 @@ import uuid
 import time
 import maya
 from copy import deepcopy
-import orjson
+import ujson
 import json
 import uuid
 from typing import List, Dict, Any
 from jamboree.base.handlers.main_handler import DBHandler
 from jamboree.base.handlers.data_handler import DataHandler
+from jamboree.base.handlers.time_handler import TimeHandler
 from jamboree import Jamboree
 from loguru import logger
 import pandas_datareader.data as web
@@ -52,9 +53,10 @@ class MultiDataManagement(DBHandler):
         self._episode = uuid.uuid4().hex
         self._is_live = False
         self.is_event = False # use to make sure there's absolutely no duplicate data. We only use it when there's a change in the data sources
-        self.datasethandler = DataHandler()
-        self.is_real_filter = True
-        self.data_handler_list = [] # Store the dataset objects we can access at once without redeclaring
+        self.datasethandler:DataHandler = DataHandler()
+        self._time:TimeHandler = TimeHandler()
+        self.is_real_filter:bool = True
+        self.data_handler_list:List[DataHandler] = [] # Store the dataset objects we can access at once without redeclaring
         self.dup_check_list = [] # use to check for duplicates in dataset
     
     @property
@@ -83,6 +85,20 @@ class MultiDataManagement(DBHandler):
     def datasets(self) -> List[DataHandler]:
         return self.data_handler_list
     
+    @property
+    def time(self) -> 'TimeHandler':
+        self._time.event = self.event
+        self._time['episode'] = self.episode
+        self._time['live'] = self.live
+        return self._time
+    
+    def sync(self):
+        """ Gets all of the datahandlers and synchronize their time object """
+        if len(self.datasets) > 0:
+            for data in self.datasets:
+                data.time = self.time
+                data.live = self.live
+                data.episode = self.episode
 
     def is_next(self) -> bool:
         """ Determine if anything is next in the head"""
@@ -126,11 +142,12 @@ class MultiDataManagement(DBHandler):
         return not_zero
 
     def _add_wo_duplicates(self, original_list:list, new_list:list):
-        original_set = set(orjson.dumps(i) for i in original_list)
+        original_set = set(ujson.dumps(i, sort_keys=True) for i in original_list)
+        print(original_list)
         for item in new_list:
-            frozen = json.dumps(item)
+            frozen = ujson.dumps(item, sort_keys=True)
             original_set.add(frozen)
-        return [orjson.loads(x) for x in original_set]
+        return [ujson.loads(x) for x in original_set]
     
     def _remove_invalid_dataset_formats(self, original_list: List[Dict[str, Any]]):
         valid_list = []
@@ -201,6 +218,7 @@ class MultiDataManagement(DBHandler):
             if self.is_real_filter == True:
                 validated_sources = self._filter_non_existing_datasets(validated_sources)
             _sources = self._add_wo_duplicates(latest_source_list, validated_sources)
+            print(_sources)
             sources_dict = {"sources": _sources}
             self.save(sources_dict)
             
@@ -245,10 +263,16 @@ class MultiDataManagement(DBHandler):
 
 
 
+    def print_times(self):
+        for data in self.datasets:
+            print(data.time)
+
+
 
 if __name__ == "__main__":
     with example_space("Multi-Data-Management") as example:
-        set_name = '4abdc31281a545afb380daa615e6c544'
+        set_name = '4abdc31281a545afb380daa615e6c5441xx'
+
         jam = Jamboree()
         multi_data = MultiDataManagement()
         multi_data["set_name"] = set_name
@@ -277,23 +301,26 @@ if __name__ == "__main__":
             "subcategories": {
                 "market": "stock",
                 "country": "US",
-                "sector": "techologyy"
+                "sector": "techologyyy"
             },
             "category": "markets"
         }
 
         dset4 = {
-            "name": "burp",
-            "category": "pricing"
+            "name": "AAPL",
+            "subcategories": {
+                "market": "stock",
+                "country": "US",
+                "sector": "techologyyy"
+            },
+            "category": "markets"
         }
 
 
-        # multi_data.is_real_filter = True
-        # multi_data.add_data_source(dset1)
+
+        full_set = [dset1, dset2, dset3, dset4]
+        multi_data.add_multiple_data_sources(full_set)
         # Check to make sure we aren't adding any dummy sources
+        multi_data.sync()
         for _ in range(1000):
-            print(multi_data.sources)
-            print(multi_data.datasets)
-        # two_set = [dset2, dset3, dset4]
-        # multi_data.add_multiple_data_sources(two_set)
-        # print(multi_data.sources)
+            print(len(multi_data.sources))
