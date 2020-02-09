@@ -142,7 +142,6 @@ class MultiDataManagement(DBHandler):
 
     def _add_wo_duplicates(self, original_list:list, new_list:list):
         original_set = set(ujson.dumps(i, sort_keys=True) for i in original_list)
-        print(original_list)
         for item in new_list:
             frozen = ujson.dumps(item, sort_keys=True)
             original_set.add(frozen)
@@ -217,7 +216,6 @@ class MultiDataManagement(DBHandler):
             if self.is_real_filter == True:
                 validated_sources = self._filter_non_existing_datasets(validated_sources)
             _sources = self._add_wo_duplicates(latest_source_list, validated_sources)
-            print(_sources)
             sources_dict = {"sources": _sources}
             self.save(sources_dict)
             
@@ -303,8 +301,8 @@ class MultiDataManagement(DBHandler):
 
 if __name__ == "__main__":
     with example_space("Multi-Data-Management") as example:
-        set_name = uuid.uuid4().hex
-
+        # set_name = uuid.uuid4().hex
+        set_name = 'ac688d95336e41bdbe61c5c804d07f1a'
         # jam = Jamboree()
         jam_proc = JamboreeNew()
         multi_data = MultiDataManagement()
@@ -354,8 +352,8 @@ if __name__ == "__main__":
 
 
         full_set = [dset1, dset2, dset3, dset4]
+        pprint.pprint(multi_data.sources)
         multi_data.add_multiple_data_sources(full_set)
-        # print(multi_data.sources)
         # Check to make sure we aren't adding any dummy sources
         multi_data.time.head = maya.now().subtract(weeks=200, hours=14)._epoch
         multi_data.time.change_stepsize(microseconds=0, days=1, hours=0)

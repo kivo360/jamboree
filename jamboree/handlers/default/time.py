@@ -3,6 +3,7 @@ import time
 import maya
 from jamboree.handlers.default import DBHandler
 from jamboree import Jamboree
+from jamboree import JamboreeNew
 
 class TimeHandler(DBHandler):
     """ 
@@ -302,12 +303,14 @@ class TimeHandler(DBHandler):
 
 if __name__ == "__main__":
     jambo = Jamboree()
+    jam_proc = JamboreeNew()
     timehandler = TimeHandler()
     timehandler.event = jambo
+    timehandler.processor = jam_proc
     eid = '0de30bb46b724fbba717ccc315c27b7f'
     timehandler["episode"] = eid
     timehandler["live"] = False
     timehandler.reset()
-    # print(maya.MayaDT(timehandler.head))
+    print(maya.MayaDT(timehandler.head))
     timehandler.head = maya.MayaDT(timehandler.head).subtract(weeks=3, days=9)._epoch
     print(maya.MayaDT(timehandler.head))

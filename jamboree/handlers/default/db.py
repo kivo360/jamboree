@@ -2,6 +2,7 @@
 import copy
 from typing import Any, Dict, Optional
 
+from jamboree import JamboreeNew
 from jamboree.base.processors.abstracts import EventProcessor, Processor
 from jamboree.handlers.base import BaseHandler
 from jamboree.utils.helper import Helpers
@@ -85,7 +86,7 @@ class DBHandler(BaseHandler):
     
     def clear_event(self) -> None:
         self.event_proc = None
-        self.processor = None
+        self._processor = None
 
     @property
     def entity(self):
@@ -239,9 +240,11 @@ class DBHandler(BaseHandler):
     def copy(self):
         """ Get everything about this DBHandler without the event inside """
         _event = self.event
+        _process = self.processor
         self.clear_event()
         copied = copy.deepcopy(self)
         self.event = _event
+        self.processor = _process
         return copied
     
     # def __str__(self) -> str:

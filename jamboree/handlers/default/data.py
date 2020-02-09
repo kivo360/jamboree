@@ -8,6 +8,7 @@ import pandas_datareader.data as web
 import ujson
 
 from jamboree import Jamboree
+from jamboree import JamboreeNew
 from jamboree.handlers.default.db import DBHandler
 from jamboree.handlers.complex.meta import MetaHandler
 from jamboree.handlers.default.time import TimeHandler
