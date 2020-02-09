@@ -334,5 +334,20 @@ class Helpers(object):
     def standardize_outputs(self, records:List[Dict[str, Any]]):
         if len(records) == 0:
             return []
-        _records = [self.standardize_record(rec) for rec in records]
+        _records = [self.generic_standardize(rec) for rec in records]
         return _records
+    
+
+    def generic_standardize(self, record:dict):
+        if bool(record) == False:
+            return {}
+        
+        _record = {}
+        for k, v in record.items():
+            # Normalize 
+            k = str(k)
+            k = k.translate({ord(c): "" for c in "!@#$%^&*()[]{};:,./<>?|`~-=_+"})
+            k = k.lower()
+            k = (k.replace(" ", "_"))
+            _record[k] = v
+        return _record

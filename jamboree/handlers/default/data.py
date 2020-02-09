@@ -63,6 +63,7 @@ class DataHandler(DBHandler):
     @property
     def time(self) -> 'TimeHandler':
         self._time.event = self.event
+        self._time.processor = self.processor
         self._time['episode'] = self.episode
         self._time['live'] = self.live
         return self._time
@@ -153,8 +154,10 @@ if __name__ == "__main__":
 
     episode_id = uuid.uuid4().hex
     jambo = Jamboree()
+    jam_processor = JamboreeNew()
     data_hander = DataHandler()
     data_hander.event = jambo
+    data_hander.processor = jam_processor
     # The episode and live parameters are probably not good for the scenario. Will probably need to switch to something else to identify data
     data_hander.episode = episode_id
     data_hander.live = False
