@@ -7,10 +7,10 @@ import json
 import uuid
 import pprint
 from typing import List, Dict, Any
-from jamboree.handlers.default.db import DBHandler
-from jamboree.handlers.default.data import DataHandler
-from jamboree.handlers.default.time import TimeHandler
-from jamboree import Jamboree
+from jamboree.handlers.default import DBHandler
+from jamboree.handlers.default import DataHandler
+from jamboree.handlers.default import TimeHandler
+from jamboree import JamboreeNew
 from loguru import logger
 import pandas_datareader.data as web
 
@@ -89,6 +89,7 @@ class MultiDataManagement(DBHandler):
     @property
     def time(self) -> 'TimeHandler':
         self._time.event = self.event
+        self._time.processor = self.processor
         self._time['episode'] = self.episode
         self._time['live'] = self.live
         return self._time
@@ -123,11 +124,13 @@ class MultiDataManagement(DBHandler):
             return
         self.dup_check_list.append(str_copy)
         self.datasethandler.event = self.event
+        self.datasethandler.processor = self.processor
         self.data_handler_list.append(_copy)
 
     def _is_data_exist(self, source:dict) -> bool:
         """ Check to see if the data exist when putting list of datahandlers together"""
         self.datasethandler.event = self.event
+        self.datasethandler.processor = self.processor
         self.datasethandler['category'] = source['category']
         self.datasethandler['subcategories'] = source['subcategories']
         self.datasethandler['name'] = source['name']
@@ -276,6 +279,7 @@ class MultiDataManagement(DBHandler):
         for dataset in self.datasets:
             dataset_name  = str(dataset)
             dataset.event = self.event
+            dataset.processor = self.processor
             if call_type == "dataframe":
                 data_set[dataset_name] = dataset.dataframe_from_head()
             else:
@@ -290,6 +294,7 @@ class MultiDataManagement(DBHandler):
         if len(self.datasets) > 0:
             for data in self.datasets:
                 data.time = self.time
+                data.time.processor = self.processor
                 data.live = self.live
                 data.episode = self.episode
     
@@ -298,12 +303,14 @@ class MultiDataManagement(DBHandler):
 
 if __name__ == "__main__":
     with example_space("Multi-Data-Management") as example:
-        set_name = '4abdc31281a545afb380daa615e6c5441xx'
+        set_name = uuid.uuid4().hex
 
-        jam = Jamboree()
+        # jam = Jamboree()
+        jam_proc = JamboreeNew()
         multi_data = MultiDataManagement()
         multi_data["set_name"] = set_name
-        multi_data.event = jam
+        # multi_data.event = jam
+        multi_data.processor = jam_proc
         multi_data.episode = uuid.uuid4().hex
         multi_data.reset()
         dset1 = {
@@ -329,7 +336,7 @@ if __name__ == "__main__":
             "subcategories": {
                 "market": "stock",
                 "country": "US",
-                "sector": "techologyyy"
+                "sector": "techologyyyyyyyy"
             },
             "category": "markets"
         }
@@ -339,7 +346,7 @@ if __name__ == "__main__":
             "subcategories": {
                 "market": "stock",
                 "country": "US",
-                "sector": "techologyyy"
+                "sector": "techologyyyyyyyy"
             },
             "category": "markets"
         }
@@ -348,6 +355,7 @@ if __name__ == "__main__":
 
         full_set = [dset1, dset2, dset3, dset4]
         multi_data.add_multiple_data_sources(full_set)
+        # print(multi_data.sources)
         # Check to make sure we aren't adding any dummy sources
         multi_data.time.head = maya.now().subtract(weeks=200, hours=14)._epoch
         multi_data.time.change_stepsize(microseconds=0, days=1, hours=0)

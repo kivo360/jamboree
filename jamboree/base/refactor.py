@@ -9,7 +9,9 @@ import base64
 from multiprocessing import cpu_count
 from jamboree.storage.databases import MongoDatabaseConnection, ZRedisDatabaseConnection
 from jamboree.utils.helper import Helpers
-from jamboree.base.processors import EventProcessor
+from jamboree.base.processors.abstracts import EventProcessor
+from jamboree.base.processors.abstracts import LegacyProcessor
+
 
 
 

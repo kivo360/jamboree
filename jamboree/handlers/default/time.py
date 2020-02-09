@@ -304,9 +304,10 @@ if __name__ == "__main__":
     jambo = Jamboree()
     timehandler = TimeHandler()
     timehandler.event = jambo
-    timehandler["episode"] = uuid.uuid4().hex
+    eid = '0de30bb46b724fbba717ccc315c27b7f'
+    timehandler["episode"] = eid
     timehandler["live"] = False
     timehandler.reset()
-    print(maya.MayaDT(timehandler.head))
-    timehandler.head = maya.now().subtract(weeks=3, days=9)._epoch
+    # print(maya.MayaDT(timehandler.head))
+    timehandler.head = maya.MayaDT(timehandler.head).subtract(weeks=3, days=9)._epoch
     print(maya.MayaDT(timehandler.head))

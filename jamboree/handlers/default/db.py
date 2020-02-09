@@ -1,8 +1,8 @@
 
 import copy
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
-from jamboree.base.processor import EventProcessor
+from jamboree.base.processors.abstracts import EventProcessor, Processor
 from jamboree.handlers.base import BaseHandler
 from jamboree.utils.helper import Helpers
 import ujson
@@ -22,9 +22,10 @@ class DBHandler(BaseHandler):
         self._required = {}
         self._query = {}
         self.data = {}
-        self.event_proc = None
-        self.main_helper = Helpers()
         self._is_event = True
+        self._processor: Optional[Processor] = None
+        self.event_proc: Optional[EventProcessor] = None
+        self.main_helper = Helpers()
 
     def __setitem__(self, key, value):
         if bool(self.required):
@@ -63,7 +64,18 @@ class DBHandler(BaseHandler):
         self._is_event = is_true
 
     @property
-    def event(self):
+    def processor(self) -> 'Processor':
+        if self._processor is None:
+            raise AttributeError("The Processor is missing")
+        return self._processor
+    
+    @processor.setter
+    def processor(self, _processor: 'Processor'):
+        self._processor = _processor
+
+
+    @property
+    def event(self) -> Optional['EventProcessor'] :
         return self.event_proc
 
     @event.setter
@@ -73,6 +85,7 @@ class DBHandler(BaseHandler):
     
     def clear_event(self) -> None:
         self.event_proc = None
+        self.processor = None
 
     @property
     def entity(self):
@@ -101,8 +114,10 @@ class DBHandler(BaseHandler):
             self._query = _query
 
     def check(self):
-        if self.event_proc is None:
-            raise AttributeError("Event processor isn't available.")
+        
+        # self.processor
+        # if self.event_proc is None:
+        #     raise AttributeError("Event processor isn't available.")
 
         if (not bool(self._entity)) or (not bool(self._required)) or (not bool(self._query)):
             raise AttributeError(f"One of the key variables is missing.")
@@ -120,23 +135,24 @@ class DBHandler(BaseHandler):
     def _get_many(self, limit: int, ar:str, alt={}):
         """ Aims to get many variables """
         query = self.setup_query(alt)
-        latest_many = self.event_proc.get_latest_many(query, abs_rel=ar, limit=limit)
+        latest_many = self.processor.event.get_latest_many(query, abs_rel=ar, limit=limit)
         return latest_many
 
     def _get_latest(self, ar, alt={}):
         query = self.setup_query(alt)
-        latest = self.event_proc.get_latest(query, abs_rel="absolute")
+        
+        latest = self.processor.event.get_latest(query, abs_rel="absolute")
         return latest
 
 
     def _last_by(self, time_index:float, ar="absolute", alt={}) -> dict:
         query = self.setup_query(alt)
-        return self.event_proc.get_latest_by(query, time_index, abs_rel=ar)
+        return self.processor.event.get_latest_by(query, time_index, abs_rel=ar)
 
 
     def _in_between(self, min_epoch:float, max_epoch:float, ar:str="absolute", alt={}):
         query = self.setup_query(alt)
-        return self.event_proc.get_between(query, min_epoch, max_epoch, abs_rel=ar)
+        return self.processor.event.get_between(query, min_epoch, max_epoch, abs_rel=ar)
 
 
     def save(self, data: dict, alt={}):
@@ -144,7 +160,7 @@ class DBHandler(BaseHandler):
         query = self.setup_query(alt)
         if self.is_event:
             data = self.main_helper.add_event_id(data)
-        self.event_proc.save(query, data)
+        self.processor.event.save(query, data)
 
     def save_many(self, data: list, ar="absolute", alt={}):
         self.check()
@@ -152,7 +168,7 @@ class DBHandler(BaseHandler):
         query = self.setup_query(alt)
         if self.is_event:
             data = self.main_helper.add_event_ids(data)
-        self.event_proc.save_many(query, data)
+        self.processor.event.save_many(query, data)
 
 
     def last(self, ar="absolute", alt={}):
@@ -172,13 +188,13 @@ class DBHandler(BaseHandler):
     def pop(self, alt={}):
         self.check()
         query = self.setup_query(alt)
-        self.event_proc.remove_first(query)
+        self.processor.event.remove_first(query)
 
 
     def pop_many(self, _limit, alt={}):
         self.check()
         query = self.setup_query(alt)
-        return self.event_proc.pop_multiple(query, _limit)
+        return self.processor.event.pop_multiple(query, _limit)
 
 
     
@@ -201,24 +217,24 @@ class DBHandler(BaseHandler):
         """ Aims to get many variables """
         self.check()
         query = self.setup_query(alt)
-        return self.event_proc.count(query)
+        return self.processor.event.count(query)
     
 
     def get_single(self, alt={}):
         self.check()
         query = self.setup_query(alt)
-        item = self.event_proc.single_get(query)
+        item = self.processor.event.single_get(query)
         return item
 
     def set_single(self, data:dict, alt={}):
         self.check()
         query = self.setup_query(alt)
-        self.event_proc.single_set(query, data)
+        self.processor.event.single_set(query, data)
 
     def delete_single(self, alt={}):
         self.check()
         query = self.setup_query(alt)
-        self.event_proc.single_delete(query)
+        self.processor.event.single_delete(query)
     
     def copy(self):
         """ Get everything about this DBHandler without the event inside """

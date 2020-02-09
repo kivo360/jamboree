@@ -1,3 +1,4 @@
-from .event import EventProcessor
-from .files import FileProcessor
-from .search import SearchProcessor
+from .abstracts.legacy import LegacyProcessor
+from .abstracts.event import EventProcessor
+from .abstracts.files import FileProcessor
+from .abstracts.search import SearchProcessor

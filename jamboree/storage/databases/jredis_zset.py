@@ -9,6 +9,7 @@ from crayons import yellow
 from pprint import pprint
 from jamboree.storage.databases import DatabaseConnection
 
+# NOTE: Can add pipelining to redis storage to make fewer calls.
 
 class RedisDatabaseZSetsConnection(DatabaseConnection):
     """ 

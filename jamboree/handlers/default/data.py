@@ -1,5 +1,6 @@
 import uuid
-
+from loguru import logger
+from crayons import magenta
 
 import maya
 import pandas as pd
@@ -8,7 +9,7 @@ import ujson
 
 from jamboree import Jamboree
 from jamboree.handlers.default.db import DBHandler
-from jamboree.base.handlers.metadata_handler import MetaHandler
+from jamboree.handlers.complex.meta import MetaHandler
 from jamboree.handlers.default.time import TimeHandler
 
 
@@ -120,10 +121,10 @@ class DataHandler(DBHandler):
         """ Get the closest information at the given head"""
         head = self.time.head
         closest = self.last_by(head, ar="relative")
-        closest.pop("name")
-        closest.pop("category")
-        closest.pop("subcategories")
-        closest.pop("type")
+        closest.pop("name", None)
+        closest.pop("category", None)
+        closest.pop("subcategories", None)
+        closest.pop("type", None)
         return closest
     
     def previous_head(self):
@@ -160,7 +161,7 @@ if __name__ == "__main__":
     data_hander['subcategories'] = {
         "market": "stock",
         "country": "US",
-        "sector": "techologyyy"
+        "sector": "techologyyyyyyyy"
     }
     data_hander['name'] = "MSFT"
     data_hander.reset()
@@ -169,12 +170,14 @@ if __name__ == "__main__":
 
     data_hander['name'] = "AAPL"
     data_hander.store_time_df(data_apple, is_bar=True)
+    data_hander.reset()
 
     data_hander.time.head = maya.now().subtract(weeks=200, hours=14)._epoch
     data_hander.time.change_stepsize(microseconds=0, days=1, hours=0)
     data_hander.time.change_lookback(microseconds=0, weeks=4, hours=0)
 
+
     while data_hander.is_next:
-        # logger.info(magenta(, bold=True))
+        logger.info(magenta(data_hander.time.head, bold=True))
         print(data_hander.dataframe_from_head())
         data_hander.time.step()
