@@ -44,7 +44,7 @@ class UploadCommand(Command):
 
 setup(
     name="jamboree",
-    version="0.3",
+    version="0.3.5",
     author="Kevin Hill",
     author_email="kah.kevin.hill@gmail.com",
     description="A fast abstracted event driven library for mongo/redis. Meant for speed",

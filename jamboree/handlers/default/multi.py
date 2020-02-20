@@ -98,6 +98,14 @@ class MultiDataManagement(DBHandler):
 
     def is_next(self) -> bool:
         """ Determine if anything is next in the head"""
+        processor = self.processor
+        is_live_list:List[bool] = []
+        for ds in self.datasets:
+            ds.processor = processor
+            ds.episode = self.episode
+            ds.live = self.live
+            is_live_list.append(ds.is_next)
+        
         return True
 
     def add_multiple_data_sources(self, sources: List[Dict[str, Any]], alt={}, allow_bypass=False):

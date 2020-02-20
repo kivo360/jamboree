@@ -74,11 +74,14 @@ class TimeHandler(DBHandler):
 
     @property
     def head(self):
+        if self['episode'] == "live" and self['live'] == True:
+            return maya.now()._epoch
         self.load_head()
         return self._head
     
     @head.setter
     def head(self, _head):
+        
         self._head = _head
         self.save_head()
 
