@@ -290,7 +290,7 @@ class MultiDataManagement(DBHandler):
                 data_set[dataset_name] = dataset.dataframe_from_head()
             else:
                 data_set[dataset_name] = dataset.closest_head()
-        self.time.step()
+        """ Remove this time step """
         self.sync()
         return data_set
     
@@ -298,11 +298,12 @@ class MultiDataManagement(DBHandler):
     def sync(self):
         """ Gets all of the datahandlers and synchronize their time object """
         if len(self.datasets) > 0:
+            self.time.processor = self.processor
             for data in self.datasets:
-                data.time = self.time
-                data.time.processor = self.processor
                 data.live = self.live
                 data.episode = self.episode
+                data.time = self.time
+
     
 
 
@@ -369,4 +370,5 @@ if __name__ == "__main__":
         multi_data.sync()
         for _ in range(1000):
             pprint.pprint(multi_data.step("current"))
+            multi_data.time.step()
             print("\n\n")

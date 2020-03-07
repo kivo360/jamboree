@@ -70,7 +70,7 @@ class DataHandler(DBHandler):
     
     @time.setter
     def time(self, _time:'TimeHandler'):
-        self._time = self.time
+        self._time = _time
     
     @property
     def metadata(self):
@@ -151,7 +151,7 @@ class DataHandler(DBHandler):
 if __name__ == "__main__":
     data_msft = web.DataReader('MSFT','yahoo',start='2010/1/1',end='2020/1/30').round(2)
     data_apple = web.DataReader('AAPL','yahoo',start='2010/1/1',end='2020/1/30').round(2)
-
+    print(data_apple)
     episode_id = uuid.uuid4().hex
     jambo = Jamboree()
     jam_processor = JamboreeNew()
@@ -183,5 +183,5 @@ if __name__ == "__main__":
 
     while data_hander.is_next:
         logger.info(magenta(data_hander.time.head, bold=True))
-        print(data_hander.dataframe_from_head())
+        # print(data_hander.dataframe_from_head())
         data_hander.time.step()
