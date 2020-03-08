@@ -53,9 +53,9 @@ setup(
     py_modules=["jamboree"],
     install_requires=[
         "redis", 'scipy', 'numpy', 'pandas', 
-        'toolz', 'cytoolz', 'funtime', 'dask', 'vaex', 
+        'toolz', 'cytoolz', 'funtime', 'dask', 
         'loguru', 'pytest', 'hiredis', 'orjson', 
-        'pebble', 'maya', 'ujson', 'gym'
+        'pebble', 'maya', 'ujson', 'gym', 'modin'
     ], 
     packages=find_packages(),
     classifiers=[

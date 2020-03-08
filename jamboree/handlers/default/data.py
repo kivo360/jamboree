@@ -4,15 +4,14 @@ from crayons import magenta
 
 import maya
 import pandas as pd
-import pandas_datareader.data as web
-import ujson
 
+import ujson
 from jamboree import Jamboree
 from jamboree import JamboreeNew
 from jamboree.handlers.default.db import DBHandler
 from jamboree.handlers.complex.meta import MetaHandler
 from jamboree.handlers.default.time import TimeHandler
-
+from jamboree.handlers.processors import DynamicResample, DataProcessorsAbstract
 
 class DataHandler(DBHandler):
     """ 
@@ -42,6 +41,7 @@ class DataHandler(DBHandler):
         self._meta:MetaHandler = MetaHandler()
         self._episode = uuid.uuid4().hex
         self._is_live = False
+        self._preprocessor:DataProcessorsAbstract = DynamicResample("data")
         self.is_event = False # use to make sure there's absolutely no duplicate data
     
     @property
@@ -89,6 +89,14 @@ class DataHandler(DBHandler):
         if len(next_keys) == 0:
             return False
         return True
+
+    @property
+    def preprocessor(self) -> DataProcessorsAbstract:
+        return self._preprocessor
+    
+    @preprocessor.setter
+    def preprocessor(self, _preprocessor: DataProcessorsAbstract):
+        self._preprocessor = _preprocessor
 
 
     def _timestamp_resample_and_drop(self, frame: pd.DataFrame, resample_size="D"):
@@ -149,6 +157,7 @@ class DataHandler(DBHandler):
 
     
 if __name__ == "__main__":
+    import pandas_datareader.data as web
     data_msft = web.DataReader('MSFT','yahoo',start='2010/1/1',end='2020/1/30').round(2)
     data_apple = web.DataReader('AAPL','yahoo',start='2010/1/1',end='2020/1/30').round(2)
     print(data_apple)

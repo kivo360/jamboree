@@ -4,6 +4,7 @@ import maya
 from copy import deepcopy
 import ujson
 import json
+import crayons as cy
 import uuid
 import pprint
 from typing import List, Dict, Any
@@ -15,6 +16,7 @@ from loguru import logger
 import pandas_datareader.data as web
 
 from jamboree.utils.context import example_space
+from jamboree.handlers.processors import DynamicResample, DataProcessorsAbstract
 
 class MultiDataManagement(DBHandler):
     """ 
@@ -56,6 +58,7 @@ class MultiDataManagement(DBHandler):
         self.is_event = False # use to make sure there's absolutely no duplicate data. We only use it when there's a change in the data sources
         self.datasethandler:DataHandler = DataHandler()
         self._time:TimeHandler = TimeHandler()
+        self._preprocessor:DataProcessorsAbstract = DynamicResample("data")
         self.is_real_filter:bool = True
         self.data_handler_list:List[DataHandler] = [] # Store the dataset objects we can access at once without redeclaring
         self.dup_check_list = [] # use to check for duplicates in dataset
@@ -94,8 +97,15 @@ class MultiDataManagement(DBHandler):
         self._time['live'] = self.live
         return self._time
     
+    @property
+    def preprocessor(self) -> DataProcessorsAbstract:
+        return self._preprocessor
     
-
+    @preprocessor.setter
+    def preprocessor(self, _preprocessor: DataProcessorsAbstract):
+        self._preprocessor = _preprocessor
+    
+    @property
     def is_next(self) -> bool:
         """ Determine if anything is next in the head"""
         processor = self.processor
@@ -106,7 +116,8 @@ class MultiDataManagement(DBHandler):
             ds.live = self.live
             is_live_list.append(ds.is_next)
         
-        return True
+        # Use all to determine if the values are falsey or not
+        return all(is_live_list)
 
     def add_multiple_data_sources(self, sources: List[Dict[str, Any]], alt={}, allow_bypass=False):
         """ Add a dataset list"""
@@ -286,6 +297,7 @@ class MultiDataManagement(DBHandler):
             dataset_name  = str(dataset)
             dataset.event = self.event
             dataset.processor = self.processor
+            dataset.preprocessor = self.preprocessor
             if call_type == "dataframe":
                 data_set[dataset_name] = dataset.dataframe_from_head()
             else:
@@ -369,6 +381,6 @@ if __name__ == "__main__":
         multi_data.time.change_lookback(microseconds=0, weeks=4, hours=0)
         multi_data.sync()
         for _ in range(1000):
-            pprint.pprint(multi_data.step("current"))
-            multi_data.time.step()
-            print("\n\n")
+            multi_data.step()
+            data = multi_data.time.step()
+            print(cy.green(f"Step {_}"))
