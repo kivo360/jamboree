@@ -136,6 +136,10 @@ class MultiDataManagement(DBHandler):
         source_list = [source]
         self.add_multiple_data_sources(source_list)
 
+    def remove_data_source(self, source: Dict[str, Any]):
+        pass
+
+
     def add_dataset_handler(self):
         _copy = self.datasethandler.copy()
         str_copy = str(_copy)
