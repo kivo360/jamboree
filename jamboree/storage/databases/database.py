@@ -89,3 +89,8 @@ class DatabaseConnection(ABC):
 
     def count(self):
         raise NotImplementedError("update_many not implemented")
+    
+
+
+    def general_lock(self, query:dict):
+        raise NotImplementedError("general_lock not implemented")

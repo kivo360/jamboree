@@ -146,7 +146,7 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
             with pipe.lock(rlock):
                 pipe.zadd(relative_time_key, relative_data)
                 pipe.zadd(absolute_time_key, absolute_data)
-            # pipe.execute()
+            pipe.execute()
 
     def save_many(self, query, data: Dict[str, float] = {}, abs_rel="absolute"):
         """ 
@@ -210,7 +210,6 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         rlock = f"{_hash}:lock"
         relative_time_key = f"{_hash}:rlist"
         absolute_time_key = f"{_hash}:alist"
-        
         with self.connection.lock(rlock):
             keys = self.connection.zrange(relative_time_key, 0, -1, withscores=True)
     
@@ -251,17 +250,17 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
             return []
 
         _hash = self.helpers.generate_hash(query)
+        count = self.count(_hash)
+        if count == 0: return []
+        
         relative_time_key = f"{_hash}:rlist"
         absolute_time_key = f"{_hash}:alist"
         with self.connection.pipeline() as pipe:
             pipe.watch(relative_time_key)
             pipe.watch(absolute_time_key)
-            count = self.count(_hash, pipe=pipe)
-            if count == 0: return []
-        
-            rkeys = pipe.zrange(relative_time_key, 0, -1, withscores=True)
-            akeys = pipe.zrange(absolute_time_key, 0, -1, withscores=True)
-        combined = self.helpers.combine_results(akeys, rkeys)
+            rkeys = self.connection.zrange(relative_time_key, 0, -1, withscores=True)
+            akeys = self.connection.zrange(absolute_time_key, 0, -1, withscores=True)
+            combined = self.helpers.combine_results(akeys, rkeys)
         return combined
 
     def query_latest(self, _query, abs_rel="absolute", limit:int=10):
@@ -286,15 +285,13 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         if not self.helpers.validate_query(_query) or abs_rel not in ["absolute", "relative"]:
             return {}
         _hash = self.helpers.generate_hash(_query)
-        _current_key = self.helpers.dynamic_key(_hash, abs_rel)
-        with self.connection.pipeline() as pipe:
-            pipe.watch(_current_key)
-            count = self.count(_hash, pipe=pipe)
-            if count == 0: return {}
+        count = self.count(_hash)
+        if count == 0: return {}
 
-            
-            keys = pipe.zrange(_current_key, -limit, -1, withscores=True)
-            if len(keys) == 0: return {}
+        
+        _current_key = self.helpers.dynamic_key(_hash, abs_rel)
+        keys = self.connection.zrange(_current_key, -limit, -1, withscores=True)
+        if len(keys) == 0: return {}
         combined = self.helpers.combined_abs_rel(keys, abs_rel=abs_rel)
         return combined
 
@@ -302,14 +299,11 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         if not self.helpers.validate_query(_query) or abs_rel not in ["absolute", "relative"]:
             return []
         _hash = self.helpers.generate_hash(_query)
+        count = self.count(_hash)
+        if count == 0: return []
+
         _current_key = self.helpers.dynamic_key(_hash, abs_rel)
-
-        with self.connection.pipeline() as pipe:
-            pipe.watch(_current_key)
-            count = self.count(_hash, pipe=pipe)
-            if count == 0: return []
-
-            keys = pipe.zrangebyscore(_current_key, min=min_epoch, max=max_epoch, withscores=True)
+        keys = self.connection.zrangebyscore(_current_key, min=min_epoch, max=max_epoch, withscores=True)
         combined = self.helpers.combined_abs_rel(keys, abs_rel=abs_rel)
         return combined
 
@@ -319,27 +313,25 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         if not self.helpers.validate_query(_query) or abs_rel not in ["absolute", "relative"]:
             return  []
         _hash = self.helpers.generate_hash(_query)
+        count = self.count(_hash)
+        if count == 0: return []
         _current_key = self.helpers.dynamic_key(_hash, abs_rel)
-        with self.connection.pipeline() as pipe:
-            pipe.watch(_current_key)
-            count = self.count(_hash, pipe=pipe)
-            if count == 0: return []
-            keys = pipe.zrangebyscore(_current_key, min=max_epoch, max="+inf", start=0, num=1, withscores=True)
-            combined = self.helpers.combined_abs_rel(keys, abs_rel)
-            if len(combined) == 0:
-                return {}
+        
+
+        keys = self.connection.zrangebyscore(_current_key, min=max_epoch, max="+inf", start=0, num=1, withscores=True)
+        combined = self.helpers.combined_abs_rel(keys, abs_rel)
+        if len(combined) == 0:
+            return {}
         return combined[0]
     
     def query_before(self, _query, max_epoch, abs_rel="absolute"):
         if not self.helpers.validate_query(_query) or abs_rel not in ["absolute", "relative"]:
             return []
         _hash = self.helpers.generate_hash(_query)
+        count = self.count(_hash)
+        if count == 0: return []
         _current_key = self.helpers.dynamic_key(_hash, abs_rel)
-        with self.connection.pipeline() as pipe:
-            pipe.watch(_current_key)
-            count = self.count(_hash, pipe=pipe)
-            if count == 0: return []
-            keys = pipe.zrangebyscore(_current_key, min="-inf", max=max_epoch, withscores=True)
+        keys = self.connection.zrangebyscore(_current_key, min="-inf", max=max_epoch, withscores=True)
         combined = self.helpers.combined_abs_rel(keys, abs_rel)
         return combined
     
@@ -347,11 +339,10 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         if not self.helpers.validate_query(_query) or abs_rel not in ["absolute", "relative"]:
             return []
         _hash = self.helpers.generate_hash(_query)
+        count = self.count(_hash)
+        if count == 0: return []
         _current_key = self.helpers.dynamic_key(_hash, abs_rel)
-        with self.connection.pipeline() as pipe:
-            count = self.count(_hash, pipe=pipe)
-            if count == 0: return []
-            keys = pipe.zrangebyscore(_current_key, min=min_epoch, max="+inf", withscores=True)
+        keys = self.connection.zrangebyscore(_current_key, min=min_epoch, max="+inf", withscores=True)
         combined = self.helpers.combined_abs_rel(keys, abs_rel)
         return combined
 
@@ -384,7 +375,7 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
                 pipe.connection.rename(_hash_key, _hash_del)
                 pipe.connection.rename(_hash_placeholder, _hash_key)
 
-                # pipe.execute()
+                pipe.execute()
 
         self._delete_all(_hash_del)
 
@@ -401,12 +392,3 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         else:
             count = self.connection.zcard(_count_hash)
         return int(count)
-    
-    def general_lock(self, query:dict):
-        """ 
-            Use this lock to wrap around step functions. 
-            It would prevent race conditions on the same object (portfolio manipulation)
-        """
-        _hash = self.helpers.generate_hash(query)
-        general_key = f"{_hash}:lock:generalized"
-        return self.connection.lock(general_key)

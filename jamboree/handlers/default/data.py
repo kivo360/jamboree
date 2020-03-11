@@ -4,15 +4,14 @@ from crayons import magenta
 
 import maya
 import pandas as pd
-import pandas_datareader.data as web
-import ujson
 
+import ujson
 from jamboree import Jamboree
 from jamboree import JamboreeNew
 from jamboree.handlers.default.db import DBHandler
 from jamboree.handlers.complex.meta import MetaHandler
 from jamboree.handlers.default.time import TimeHandler
-
+from jamboree.handlers.processors import DynamicResample, DataProcessorsAbstract
 
 class DataHandler(DBHandler):
     """ 
@@ -42,6 +41,7 @@ class DataHandler(DBHandler):
         self._meta:MetaHandler = MetaHandler()
         self._episode = uuid.uuid4().hex
         self._is_live = False
+        self._preprocessor:DataProcessorsAbstract = DynamicResample("data")
         self.is_event = False # use to make sure there's absolutely no duplicate data
     
     @property
@@ -62,7 +62,7 @@ class DataHandler(DBHandler):
 
     @property
     def time(self) -> 'TimeHandler':
-        self._time.event = self.event
+        # self._time.event = self.event
         self._time.processor = self.processor
         self._time['episode'] = self.episode
         self._time['live'] = self.live
@@ -90,6 +90,14 @@ class DataHandler(DBHandler):
             return False
         return True
 
+    @property
+    def preprocessor(self) -> DataProcessorsAbstract:
+        return self._preprocessor
+    
+    @preprocessor.setter
+    def preprocessor(self, _preprocessor: DataProcessorsAbstract):
+        self._preprocessor = _preprocessor
+
 
     def _timestamp_resample_and_drop(self, frame: pd.DataFrame, resample_size="D"):
         timestamps = pd.to_datetime(frame.time, unit='s')
@@ -112,6 +120,7 @@ class DataHandler(DBHandler):
 
     def dataframe_from_head(self):
         """ Get a dataframe between a head and tail. Resample according to our settings"""
+        
         head = self.time.head
         tail = self.time.tail
         values = self.in_between(tail, head, ar="relative")
@@ -140,6 +149,8 @@ class DataHandler(DBHandler):
         self.metadata.reset()
         self.time.reset()
     
+    
+    
     def __str__(self) -> str:
         name = self["name"]
         category = self["category"]
@@ -149,6 +160,7 @@ class DataHandler(DBHandler):
 
     
 if __name__ == "__main__":
+    import pandas_datareader.data as web
     data_msft = web.DataReader('MSFT','yahoo',start='2010/1/1',end='2020/1/30').round(2)
     data_apple = web.DataReader('AAPL','yahoo',start='2010/1/1',end='2020/1/30').round(2)
     print(data_apple)
@@ -180,8 +192,8 @@ if __name__ == "__main__":
     data_hander.time.change_stepsize(microseconds=0, days=1, hours=0)
     data_hander.time.change_lookback(microseconds=0, weeks=4, hours=0)
 
-
+    
     while data_hander.is_next:
         logger.info(magenta(data_hander.time.head, bold=True))
-        # print(data_hander.dataframe_from_head())
+        print(data_hander.dataframe_from_head())
         data_hander.time.step()

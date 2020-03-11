@@ -239,14 +239,20 @@ class DBHandler(BaseHandler):
     
     def copy(self):
         """ Get everything about this DBHandler without the event inside """
-        _event = self.event
+        # _event = self.event
+        # self.event = _event
+        
         _process = self.processor
         self.clear_event()
-        copied = copy.deepcopy(self)
-        self.event = _event
-        self.processor = _process
+        copied:self = copy.deepcopy(self)
+        copied.processor = _process
         return copied
     
+    def lock(self, alt={}):
+        self.check()
+        query = self.setup_query(alt)
+        return self.processor.event.lock(query)
+
     # def __str__(self) -> str:
     #     """ 
     #         self._entity = ""
