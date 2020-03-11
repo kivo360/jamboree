@@ -253,3 +253,9 @@ class JamboreeEvents(EventProcessor):
     def single_delete(self, query:dict):
         if self._validate_query(query) == False: return
         self.redis_conn.kill(query)
+    
+    def lock(self, query:dict):
+        if self._validate_query(query) == False:
+            raise ValueError("The query isn't correct")
+        
+        return self.redis_conn.general_lock(query)

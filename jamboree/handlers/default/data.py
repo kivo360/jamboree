@@ -62,7 +62,7 @@ class DataHandler(DBHandler):
 
     @property
     def time(self) -> 'TimeHandler':
-        self._time.event = self.event
+        # self._time.event = self.event
         self._time.processor = self.processor
         self._time['episode'] = self.episode
         self._time['live'] = self.live
@@ -120,6 +120,7 @@ class DataHandler(DBHandler):
 
     def dataframe_from_head(self):
         """ Get a dataframe between a head and tail. Resample according to our settings"""
+        
         head = self.time.head
         tail = self.time.tail
         values = self.in_between(tail, head, ar="relative")
@@ -147,6 +148,8 @@ class DataHandler(DBHandler):
         """ Reset the data we're querying for. """
         self.metadata.reset()
         self.time.reset()
+    
+    
     
     def __str__(self) -> str:
         name = self["name"]
@@ -189,8 +192,8 @@ if __name__ == "__main__":
     data_hander.time.change_stepsize(microseconds=0, days=1, hours=0)
     data_hander.time.change_lookback(microseconds=0, weeks=4, hours=0)
 
-
+    
     while data_hander.is_next:
         logger.info(magenta(data_hander.time.head, bold=True))
-        # print(data_hander.dataframe_from_head())
+        print(data_hander.dataframe_from_head())
         data_hander.time.step()

@@ -386,5 +386,6 @@ if __name__ == "__main__":
         multi_data.sync()
         for _ in range(1000):
             multi_data.step()
-            data = multi_data.time.step()
-            print(cy.green(f"Step {_}"))
+            multi_data.time.step()
+            current_time = multi_data.time.head
+            print(cy.magenta(f"Step {current_time}"))

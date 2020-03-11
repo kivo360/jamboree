@@ -53,3 +53,6 @@ class EventProcessor(ABC):
 
     def single_delete(self, query:dict):
         raise NotImplementedError
+
+    def lock(self, query):
+        raise NotImplementedError
