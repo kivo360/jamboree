@@ -1,11 +1,13 @@
 import time
 import maya
 import uuid
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Set
 from loguru import logger
-from jamboree.handlers.default import DBHandler
 from jamboree import Jamboree, JamboreeNew
+from jamboree.handlers.default import DBHandler
+from jamboree.utils.helper import Helpers
 
+helpers = Helpers()
 
 class RequirementsHandler(DBHandler):
     """ 
@@ -22,7 +24,8 @@ class RequirementsHandler(DBHandler):
         }
         self._episode:str = uuid.uuid4().hex
         self._live:bool = False
-        self._assets:List[str] = []
+        self._assets:List[Dict[Any, Any]] = []
+        self._items_compressed:Set[str] = set() #
         self._reporting = {}
     
     @property
@@ -53,6 +56,27 @@ class RequirementsHandler(DBHandler):
         unique_item.reset()
         return unique_item
 
+    
+    def asset_update(self, items:List[Dict[Any, Any]], command="add"):
+        if len(items) == 0:
+            return
+        
+        if command not in ["add", "sub"]: return
+        
+        _current_items = set()
+        [_current_items.add(helpers.generate_hash(x)) for x in items]
+        old_items = self.items
+        if command == "add":
+            old_items = old_items.union(_current_items)
+        else:
+            old_items = old_items.difference(_current_items)
+        print(len(old_items))
+        self.items = old_items
+        # self.assets = self.decomp_items
+        self.update()
+
+
+
     @property
     def assets(self):
         return self._assets
@@ -60,6 +84,21 @@ class RequirementsHandler(DBHandler):
     @assets.setter
     def assets(self, _assets):
         self._assets = _assets
+        self.assets_to_items()
+
+    @property
+    def items(self) -> Set:
+        return self._items_compressed
+    
+    @items.setter
+    def items(self, _items:Set[str]):
+        self._items_compressed = _items
+
+    @property
+    def decomp_items(self):
+        if len(self.items) == 0: return []
+        return [helpers.hash_to_dict(x) for x in self.items]
+
 
     @property
     def is_valid(self):
@@ -68,10 +107,13 @@ class RequirementsHandler(DBHandler):
             return False
         return all(report_values)
 
-    def report(self, asset:str):
+    def report(self, asset:Dict[Any, Any]):
         """ Report that we've passed over an asset """
-        self._reporting[asset] = True
+        itemized = helpers.generate_hash(asset)
+        self._reporting[itemized] = True
         self.update()
+
+
 
     def load(self):
         """ Load all of the assets and the status of those assets as well """
@@ -79,20 +121,34 @@ class RequirementsHandler(DBHandler):
         report_set = self.last(alt={"detail": "report"})
         self.assets = asset_set.get("assets", [])
         self._reporting = report_set.get("report", {})
+        self.general_update()
+
+    def assets_to_items(self):
+        _item_list = set()
+        for asset in self.assets:
+            _item_list.add(helpers.generate_hash(asset))
+        self._items_compressed = _item_list
+    
+    def items_to_assets(self):
+        pass
 
     def update(self):
-        self.reset_reporting()
-        data = {"assets": self.assets}
-        report = {"report": self._reporting}
-        self.save(data)
+        self.general_update()
+        data = {"assets": self.assets, "time": time.time(), "timestamp": time.time()}
+        report = {"report": self._reporting, "time": time.time(), "timestamp": time.time()}
+        self.save(data, alt={})
+        # print(count)
         self.save(report, alt={"detail": "report"})
 
     def reset_reporting(self):
-        for asset in self.assets:
-            self._reporting[asset] = self._reporting.get(asset, False)
+        for item in self.items:
+            self._reporting[item] = self._reporting.get(item, False)
+    
+    def general_update(self):
+        self.assets = self.decomp_items
+        self.reset_reporting()
 
     def reset(self):
-        self.check()
         req_count = self.count()
         if req_count == 0:
             logger.debug("Updating for the first time")
@@ -103,15 +159,31 @@ class RequirementsHandler(DBHandler):
 
 
 if __name__ == "__main__":
+    
+    all_assets = ["BTC", "XTZ", "ETH", "ATX", "XRP", "BCH", "BSV", "LTC", "EOS"]
+
     jambo = JamboreeNew()
     reqhandler = RequirementsHandler()
     reqhandler.processor = jambo
-    reqhandler['name'] = uuid.uuid4().hex
-    reqhandler.assets = ["BTC", "ABC", "ETH", "ATX"]
+    # The name is on rick and morty so it's not perverted. I can prove it
+    reqhandler['name'] = "Poopybutthole"
+    reqhandler.assets = [
+        {
+            "name": x, 
+            "category": "market", 
+            "subcategories": {"exchange": "fake_exchange"}
+        } 
+        for x in all_assets
+    ]
     reqhandler.reset()
-    
-
-    unique = reqhandler.unique()
-    unique = reqhandler.unique()
-    unique = reqhandler.unique()
-    # print(unique)
+    new_items = [
+        {
+            "name": x, 
+            "category": "market", 
+            "subcategories": {"exchange": "fake_exchange"}
+        } 
+        for x in ["ONE", "TWO", "THREE", "FOUR", "BTC", "ATX"]
+    ]
+    reqhandler.asset_update(new_items, command="sub")
+    print(len(reqhandler.assets))
+    reqhandler.reset()
