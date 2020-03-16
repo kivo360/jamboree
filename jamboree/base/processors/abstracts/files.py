@@ -7,7 +7,7 @@ class FileProcessor(ABC):
 
 
     def save_many(self, query: dict, data: List[dict], abs_rel="absolute"):
-        raise NotImplementedError    
+        raise NotImplementedError
 
 
     def get_latest(self, query, abs_rel="absolute") -> dict:

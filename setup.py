@@ -44,7 +44,7 @@ class UploadCommand(Command):
 
 setup(
     name="jamboree",
-    version="0.3.9",
+    version="0.4.1",
     author="Kevin Hill",
     author_email="kah.kevin.hill@gmail.com",
     description="A fast abstracted event driven library for mongo/redis. Meant for speed",
@@ -53,9 +53,10 @@ setup(
     py_modules=["jamboree"],
     install_requires=[
         "redis", 'scipy', 'numpy', 'pandas', 
-        'toolz', 'cytoolz', 'funtime', 'dask', 
-        'loguru', 'pytest', 'hiredis', 'orjson', 
-        'pebble', 'maya', 'ujson', 'gym', 'modin'
+        'toolz', 'cytoolz', 'funtime', 'dask[all]', 
+        'pandas_datareader', 'loguru', 'pytest', 
+        'hiredis', 'orjson', 'pebble', 'maya', 
+        'ujson', 'gym', 'modin'
     ], 
     packages=find_packages(),
     classifiers=[
