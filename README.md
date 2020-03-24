@@ -217,5 +217,3 @@ with timecontext():
     print(sample_env_handler.transactions)
 ```
 
-
-

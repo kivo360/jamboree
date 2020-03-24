@@ -4,7 +4,7 @@ import maya
 import orjson
 import ujson
 from typing import List
-from redis import Redis
+import redis
 from funtime import Store
 from pebble.pool import ThreadPool
 import base64
@@ -53,7 +53,7 @@ class Jamboree(EventProcessor):
     """Adds and retrieves events at extremely fast speeds. Use to handle portfolio and trade information quickly."""
 
     def __init__(self, mongodb_host="localhost", redis_host="localhost", redis_port=6379):
-        self.redis = Redis(redis_host, port=redis_port)
+        self.redis = redis.Redis(redis_host, port=redis_port)
         self.store = Store(mongodb_host).create_lib('events').get_store()['events']
         self.pool = ThreadPool(max_workers=cpu_count() * 4)
 

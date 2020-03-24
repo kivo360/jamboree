@@ -4,7 +4,8 @@ import maya
 from crayons import magenta
 from contextlib import ContextDecorator, contextmanager
 from contextlib import contextmanager
-
+from redis.exceptions import WatchError
+import redis
 class timecontext(ContextDecorator):
     def __enter__(self):
         self.start = maya.now()._epoch
@@ -16,6 +17,14 @@ class timecontext(ContextDecorator):
         print(f"It took {delta}ms")
         return False
 
+@contextmanager
+def watch_loop():
+    while True:
+        try:
+            yield
+            break
+        except WatchError:
+            continue
 
 class example_space(ContextDecorator):
     def __init__(self, name) -> None:
