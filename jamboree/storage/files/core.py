@@ -12,10 +12,12 @@ class FileStorageConnection(ABC):
         self._settings.overwrite = False
         self._settings.sig_key = kwargs.get("signature", "basic_key")
         
-        self._settings.query.by = "latest"
-        self._settings.query.limit = 500
+        self._settings.preferences.by = "latest"
+        self._settings.preferences.limit = 500
+        self._settings.preferences.version = None
         self._settings.default.version = "0.0.1"
         self._settings.default.increment = VersionComponent.Patch
+        
 
 
 
@@ -41,9 +43,12 @@ class FileStorageConnection(ABC):
         self._settings = copied
 
     def valid_settings(self, _settings):
-        if self._settings.query.by not in ["latest", "all", "version"]:
+        if self._settings.preferences.by not in ["latest", "many", "all", "version"]:
             raise ValueError("We must query within a given range of types: 'latest', 'all', 'version'")
-    
+        
+        if self._settings.preferences.by == "version" and self._settings.preferences.version is None:
+            raise AttributeError("If you're querying by version, you have to include a version number (string_format)")
+
     @property
     def is_overwrite(self) -> bool:
         return self._settings.overwrite

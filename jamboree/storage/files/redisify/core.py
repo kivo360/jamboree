@@ -2,7 +2,7 @@ import maya
 from threading import local
 from jamboree.storage.files import FileStorageConnection
 from jamboree.utils.core import consistent_hash
-from jamboree.utils.support.storage import serialize
+from jamboree.utils.support.storage import serialize, deserialize
 from jamboree.utils.context import watch_loop
 from addict import Dict
 import redis
@@ -10,6 +10,7 @@ from redis import Redis
 from redis.client import Pipeline
 import version_query
 from loguru import logger
+logger.disable(__name__)
 
 class RedisFileProcessor(object):
     def __init__(self, *args, **kwargs):
@@ -50,14 +51,21 @@ class RedisFileConnection(FileStorageConnection):
         self.current_pipe = None
         self.current_hash_keys = None
         self.current_version = None
+        self.current_version_exist = None
+
+    def gwatch(self):
+        sorted_version = self.keys.version.sorted
+        set_version = self.keys.version.set
+        self.pipe.watch(sorted_version)
+        self.pipe.watch(set_version)
 
     @property
     def version(self):
         """ Get the latest version or the default"""
         sorted_version = self.keys.version.sorted
         set_version = self.keys.version.set
-        self.pipe.watch(sorted_version)
-        self.pipe.watch(set_version)
+        # self.pipe.watch(sorted_version)
+        # self.pipe.watch(set_version)
         if self.query_exists and self.current_version is None:
             # latest_version = self.connection.zrange(sorted_version, -1, -1)
             # _all_versions = self.connection.zrange(sorted_version, 0, -1)
@@ -71,7 +79,7 @@ class RedisFileConnection(FileStorageConnection):
         else:
             latest_version = self.settings.default.version
             self.pipe.zadd(sorted_version, {latest_version: maya.now()._epoch})
-            self.pipe.sadd(set_version, *latest_version)
+            self.pipe.sadd(set_version, latest_version)
             self.current_version = latest_version
         return self.current_version
     
@@ -108,12 +116,20 @@ class RedisFileConnection(FileStorageConnection):
         if self.current_query_exist is None:
             version_set_exist = self.pipe.exists(self.keys.version.set)
             sorted_version_exist = self.pipe.exists(self.keys.version.sorted)
+
             self.current_query_exist = (version_set_exist == 1 and sorted_version_exist == 1)
         return self.current_query_exist
     
     @property
     def file_exist(self) -> bool:
-        return True
+        """ Does the current file version exist"""
+        
+        if self.current_version_exist is None:
+            vk = self.version_key
+            self.pipe.watch(vk)
+            version_set_exist = self.pipe.exists(vk)
+            self.current_version_exist = (version_set_exist == 1)
+        return self.current_version_exist
     
     @property
     def pipe(self):
@@ -124,55 +140,67 @@ class RedisFileConnection(FileStorageConnection):
     @property
     def version_key(self) -> str:
         return f"{self.hash_query}:{self.version}"
-
-
-    def save(self, query:dict, obj, **kwargs):
-        self.reset()
-        self.settings = kwargs
-        self.current_query = query
-        
-        serial_item = serialize(obj)
-        self.update(serial_item)
-        
-        
-    def update(self, file):
-        self.update_version()
-        self.update_file(file)
+    
 
     def update_version(self):
         """ Save version in multiple places to be found later"""
         version =  self.version
-        logger.info(version)
-        
         if self.query_exists and not self.is_overwrite:
             vs = version_query.Version.from_str(version)
             new_vs = vs.increment(self.settings.default.increment)
             new_vs_str = new_vs.to_str()
             self.version = new_vs_str
 
-    def update_checksum(self, checksum):
-        """ Add a checksum to both general keys and """
-        k = self.keys.file.sum
-        ck = f"{checksum}:sumkey"
-        self.pipe.sadd(k, checksum)
-        self.pipe.set(ck, f"{True}")
-
+    
     def update_file(self, _file):
-        
+        """Update the file"""
         vkey = self.version_key
         self.pipe.set(vkey, _file)
 
-    def query(self, query:dict, objs, **kwargs):
-        self.reset()
-        self.settings = kwargs
-        self.current_query = query
+    def update(self, file):
+        """ Update the file version and update the file. """
+        self.update_version()
+        self.update_file(file)
+
+
+    @logger.catch
+    def save(self, query:dict, obj, **kwargs):
+        self.setup(query, **kwargs)
+        serial_item = serialize(obj)
+        self.update(serial_item)
+        
+        
+    
+
+    @logger.catch
+    def query(self, query:dict, **kwargs):
+        self.setup(query, **kwargs)
+        if self.query_exists and self.file_exist:
+            # If the query and file exist
+            logger.debug("File exist, we're gonna try pulling it")
+            item = self.pipe.get(self.version_key)
+            unpacked = deserialize(item)
+            if unpacked is None:
+                raise AttributeError("Pickled Item Not Found")
+            return unpacked
+
 
     def delete(self, query:dict, **kwargs):
+        self.setup(query, **kwargs)
+        if self.query_exists and self.file_exist:
+            # If the query and file exist
+            sorted_version = self.keys.version.sorted
+            set_version = self.keys.version.set
+            self.pipe.delete(self.version_key)
+            self.pipe.zrem(sorted_version, self.version)
+            self.pipe.srem(set_version, self.version)
+    
+    def setup(self, query:dict, **kwargs):
         self.reset()
         self.settings = kwargs
         self.current_query = query
-
-    
+        self.gwatch()
+        self.version
     
     def reset(self):
         """ Reset all placeholder variables"""
@@ -180,6 +208,10 @@ class RedisFileConnection(FileStorageConnection):
         self.current_hash = None
         self.current_query_exist = None
         self.current_pipe = self.conn.pipeline()
+        self.current_version = None
+        self.current_version_exist = None
+
+
 
 class SampleObj(object):
     def __init__(self) -> None:
@@ -188,12 +220,17 @@ class SampleObj(object):
 
 def main():
     current_settings = Dict()
+    query_dict = Dict()
     current_settings.overwrite = True
+    current_settings.preferences = query_dict
     samp_opt = SampleObj()
     redpill = redis.Redis()
     redconn = RedisFileConnection()
     redconn.conn = redpill
     redconn.save({"one": "twoss"}, samp_opt, **current_settings)
+    item = redconn.query({"one": "twoss"})
+    logger.info(item)
+
     # redconn.pipe.execute()
 
 if __name__ == "__main__":

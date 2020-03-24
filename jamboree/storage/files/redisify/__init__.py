@@ -1,1 +1,1 @@
-from .core import RedisFileProcessor
+from .core import RedisFileProcessor, RedisFileConnection

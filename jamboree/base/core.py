@@ -2,6 +2,7 @@ from redis import Redis
 from jamboree.base.processors.abstracts import Processor
 from jamboree.base.processors.event import JamboreeEvents
 from jamboree.base.processors.files import JamboreeFileProcessor
+
 class Jamboree(Processor):
     def __init__(self, **kwargs) -> None:
         super().__init__()
@@ -24,4 +25,3 @@ class Jamboree(Processor):
         self.event.rconn = rconn
         self.event.initialize()
         self.storage.initialize()
-        

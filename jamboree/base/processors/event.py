@@ -1,9 +1,9 @@
-from copy import copy
+from copy import Error, copy
 import orjson
 import ujson
-from typing import List
+from typing import List, Optional
 import redis
-# from redis import Redis
+from redis import Redis
 from funtime import Store
 from pebble.pool import ThreadPool
 import base64
@@ -20,17 +20,46 @@ class JamboreeEvents(EventProcessor):
     """Adds and retrieves events at extremely fast speeds. Use to handle portfolio and trade information quickly."""
 
     def __init__(self, mongodb_host="localhost", redis_host="localhost", redis_port=6379):
-        self.redis = redis.Redis(redis_host, port=redis_port)
-        self.store = Store(mongodb_host).create_lib('events').get_store()['events']
-        self.pool = ThreadPool(max_workers=cpu_count() * 6)
-        self.mongo_conn = MongoDatabaseConnection()
-        self.redis_conn = ZRedisDatabaseConnection()
-        self.mongo_conn.connection = self.store
-        self.redis_conn.connection = self.redis
+        # self.redis = redis.Redis(redis_host, port=redis_port)
+        self._redis:Optional[Redis] = None
+        self._redis_conn = ZRedisDatabaseConnection()
         self.dominant_database = ""
         self.helpers = Helpers()
+        self.pool = ThreadPool(max_workers=cpu_count() * 6)
+
+        # self.store = Store(mongodb_host).create_lib('events').get_store()['events']
+        # self.mongo_conn = MongoDatabaseConnection()
+        # self.redis_conn = ZRedisDatabaseConnection()
+        
+        # # self.mongo_conn.connection = self.store
+        # self.redis_conn.connection = self.redconn
         # self.redis_conn.pool = self.pool
         # self.mongo_conn.pool = self.pool
+    
+    @property
+    def rconn(self) -> redis.client.Redis:
+        if self._redis is None:
+            raise AttributeError("You've yet to add a redis connection")
+        return self._redis
+    
+    @rconn.setter
+    def rconn(self, _redis:redis.client.Redis):
+        self._redis = _redis
+
+    @property
+    def redis_conn(self) -> ZRedisDatabaseConnection:
+        if self._redis_conn is None:
+            raise AttributeError("Redis connection hasn't been set")
+        return self._redis_conn
+    
+    @redis_conn.setter
+    def redis_conn(self, _rconn: ZRedisDatabaseConnection):
+        self._redis_conn = _rconn
+
+    def initialize(self):
+        """ Initialize database connections. Use this so we can use the same connections for search, files, and events. """
+        self.redis_conn = ZRedisDatabaseConnection()
+        self.redis_conn.connection = self.rconn
 
     def _validate_query(self, query: dict):
         """ Validates a query. Must have `type` and a second identifier at least"""
@@ -47,13 +76,6 @@ class JamboreeEvents(EventProcessor):
         _hash = base64.b64encode(str.encode(_hash))
         _hash = _hash.decode('utf-8')
         return _hash
-
-    def _check_redis_for_prior(self, _hash: str) -> bool:
-        """ Checks to see if any """
-        prior_length = self.redis.llen(_hash)
-        if prior_length == 0:
-            return False
-        return True
 
     
 
@@ -165,12 +187,11 @@ class JamboreeEvents(EventProcessor):
 
     def query_direct(self, query):
         """ Queries from mongodb directly. Used to search extremely large queries. """
-        latest_items = list(self.store.query_latest(query))
-        return latest_items
+        return {}
 
     def query_direct_latest(self, query):
         """ Queries from mongodb directly. Used to search extremely large queries. """
-        return self.mongo_conn.query_latest(query)
+        return {}
 
     def get_latest(self, query, abs_rel="absolute"):
         """ Gets the latest query"""
@@ -230,9 +251,7 @@ class JamboreeEvents(EventProcessor):
         if count is not None:
             return count, "redis"
 
-        records = list(self.store.query(query))
-        record_len = len(records)
-        return record_len, "mongo"
+        return 0, "mongo"
 
     def count(self, query):
         """ """

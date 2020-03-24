@@ -19,6 +19,7 @@ class DBHandler(BaseHandler):
 
     def __init__(self):
         # print("DBHandler")
+        self._metatype = "event"
         self._entity = ""
         self._required = {}
         self._query = {}
@@ -50,6 +51,7 @@ class DBHandler(BaseHandler):
     def setup_query(self, alt={}):
         query = copy.copy(self._query)
         query['type'] = self.entity
+        query['mtype'] = self._metatype
         query.update(alt)
         query.update(self.data)
         return query
