@@ -4,12 +4,12 @@ from loguru import logger
 import maya
 from jamboree.handlers.complex.backtest import BacktestBlobHandler
 from jamboree import Jamboree
-# from jamboree.procedures import ModelProcedureAbstract
+from jamboree.utils.procedures import ModelProcedureAbstract
 from addict import Dict
 
-class ModelHandler(BacktestBlobHandler):
+class BaseModelHandler(BacktestBlobHandler):
     def __init__(self) -> None:
-        super(ModelHandler, self).__init__()
+        super(BaseModelHandler, self).__init__()
         self.entity = "genmodel" # Gen model represents general model
         self.required = {
             "name": str,
@@ -19,17 +19,10 @@ class ModelHandler(BacktestBlobHandler):
         self.model_type = ""
         # 
         # All of the parts of the model we'll
-        self._mparts = {
-            "criterion": None,
-            "optimizer": None,
-            "model": None
-        }
+        self.net = None
+        self.criterion = None
+        self.optimizer = None
 
-        self._mreq = {
-            "criterion": False,
-            "optimizer": False,
-            "model": True
-        }
         self.online = False
         self.current_model = None
 
@@ -39,6 +32,40 @@ class ModelHandler(BacktestBlobHandler):
             "sklearn", "torch", "keras", "creme", "tensorflow", "sonnet", "jax"
         ]
     
+    @property
+    def procedure(self):
+        return {
+
+        }[self.model_type]
+    
+    def open(self):
+        if self.absolute_exists():
+            self.current_model = self.last()
+
+    def close(self):
+        """ Take the model from the model procedure and save it. """
+        pass
+
+    @property
+    def model(self):
+        if self.current_model is None:
+            """ Create a model using the net, criterion, and optimizer items """
+            mdict = {
+                "model": self.net,
+                "optimizer": self.optimizer,
+                "criterion": self.criterion
+            }
+            pass
+        pass
+
+    def verify(self):
+        """ Verifies the information that that's inside of the constructor"""
+        if not isinstance(self.model_type, str) or (self.model_type not in self.available):
+            raise ValueError("Model type is not valid type")
+        if not isinstance(self.online, bool):
+            raise ValueError("Not able to determine if this model is online")
+        # No idea what else should be here
+
     """
         Separate the processors
     """
@@ -53,20 +80,20 @@ def main():
     """
         # EXAMPLE USE CASE
         jam = Jamboree()
-        compute_engine = CustomTorchHandler()
 
+        ### Custom Torch Handler Should Have A Model Inside Already
+        compute_engine = CustomTorchHandler()
+        compute_engine.processor = jam
+        compute_engine['name'] = "MNIST
+        compute_engine['category'] = "image"
+        compute_engine['subcategories'] = {}
+        compute_engine.reset()
+
+        with compute_engine as model:
+            prediction = model.fit_predict(data)
+
+        Use prediction here
     """
-    # jam = Jamboree()
-    # mhand = ModelHandler()
-    # mhand['name'] = "online_regression"
-    # mhand['category'] = "market"
-    # mhand['subcategories'] = {}
-    # mhand.processor = jam
-    # mhand.reset()
-    # mhand.online = True
-    # # mhand.model = "DICKS"
-    # # mhand.save_model()
-    # # mhand.fit(1, 2)
 
 
 
