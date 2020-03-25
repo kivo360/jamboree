@@ -1,4 +1,3 @@
-from .base.old.flat_jam import Jamboree as Jambold
 from .base.core import Jamboree
 from .base.processors.main import Jamboree as JamboreeNew
 from .handlers.base import BaseHandler
