@@ -5,15 +5,15 @@ from crayons import magenta
 import maya
 import pandas as pd
 
-import ujson
-from jamboree import Jamboree
+
 from jamboree import JamboreeNew
-from jamboree.handlers.default.db import DBHandler
-from jamboree.handlers.complex.meta import MetaHandler
-from jamboree.handlers.default.time import TimeHandler
+from jamboree.handlers.complex.backtest import BacktestDBHandler
 from jamboree.handlers.processors import DynamicResample, DataProcessorsAbstract
 from jamboree.utils.core import omit
-class MetricHandler(DBHandler):
+
+
+
+class MetricHandler(BacktestDBHandler):
     """ 
         # METRIC HANDLER
         ---
@@ -43,58 +43,9 @@ class MetricHandler(DBHandler):
             "name": str
         }
         
-        
-        # Other objects to consider
-        self._time:TimeHandler = TimeHandler()
-        self._meta:MetaHandler = MetaHandler()
-        self._episode = uuid.uuid4().hex
+    
         self._preprocessor:DataProcessorsAbstract = DynamicResample("data")
         
-        
-        self._is_live = False
-        self.is_event = False # use to make sure there's absolutely no duplicate data
-    
-    @property
-    def episode(self) -> str:
-        return self._episode
-    
-    @episode.setter
-    def episode(self, _episode:str):
-        self._episode = _episode
-    
-    @property
-    def live(self) -> bool:
-        return self._is_live
-    
-    @live.setter
-    def live(self, _live:bool):
-        self._is_live = _live
-
-    @property
-    def time(self) -> 'TimeHandler':
-        # self._time.event = self.event
-        self._time.processor = self.processor
-        self._time['episode'] = self.episode
-        self._time['live'] = self.live
-        return self._time
-    
-    @time.setter
-    def time(self, _time:'TimeHandler'):
-        self._time = _time
-    
-    @property
-    def metadata(self):
-        """ 
-            # METADATA
-            ---
-            Get all of the metadata involving this metric. 
-        """
-        self._meta.event = self.event
-        self._meta['category'] = self['category']
-        self._meta.subcategories = self['subcategories']
-        self._meta.name = self['name']
-        return self._meta
-    
 
     @property
     def preprocessor(self) -> DataProcessorsAbstract:
@@ -124,9 +75,8 @@ class MetricHandler(DBHandler):
 
     def reset(self):
         """ Reset the data we're querying for. """
+        super().reset()
         self.reset_current_metric()
-        self.metadata.reset()
-        self.time.reset()
     
     
     

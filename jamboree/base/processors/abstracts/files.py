@@ -38,3 +38,6 @@ class FileProcessor(ABC):
     def delete_all(self, query:dict, **kwargs):
         """ Purge everything """
         raise NotImplementedError
+    
+    def absolute_exists(self, query:dict, **kwargs):
+        raise NotImplementedError

@@ -65,3 +65,5 @@ class FileStorageConnection(ABC):
     def delete(self, query, **kwargs):
         raise NotImplementedError("delete_latest not implemented")
 
+    def absolute_exists(self, query, **kwargs):
+        raise NotImplementedError

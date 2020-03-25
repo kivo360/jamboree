@@ -281,6 +281,14 @@ testing = ["packaging", "importlib-resources"]
 
 [[package]]
 category = "main"
+description = "Extra features for Python's JSON: comments, order, numpy, pandas, datetimes, and many more! Simple but customizable."
+name = "json-tricks"
+optional = false
+python-versions = "*"
+version = "3.14.0"
+
+[[package]]
+category = "main"
 description = "Python logging made (stupidly) simple"
 name = "loguru"
 optional = false
@@ -730,7 +738,7 @@ docs = ["sphinx", "jaraco.packaging (>=3.2)", "rst.linker (>=1.9)"]
 testing = ["jaraco.itertools", "func-timeout"]
 
 [metadata]
-content-hash = "37378c5c1c61f654ee1336537aa60473bc5e5761de3a5483e721c6a4238e0915"
+content-hash = "a03560f36080e22565664245f1baf253136068b35a2e4d4d966cfe84f083d884"
 python-versions = "^3.7"
 
 [metadata.files]
@@ -826,6 +834,10 @@ idna = [
 importlib-metadata = [
     {file = "importlib_metadata-1.5.0-py2.py3-none-any.whl", hash = "sha256:b97607a1a18a5100839aec1dc26a1ea17ee0d93b20b0f008d80a5a050afb200b"},
     {file = "importlib_metadata-1.5.0.tar.gz", hash = "sha256:06f5b3a99029c7134207dd882428a66992a9de2bef7c2b699b5641f9886c3302"},
+]
+json-tricks = [
+    {file = "json_tricks-3.14.0-py2.py3-none-any.whl", hash = "sha256:b2629022b7bb00606925739a545ec71e227c1c57262956800186de9e4e171cec"},
+    {file = "json_tricks-3.14.0.tar.gz", hash = "sha256:628599394a482b6aaaf352e2be2215c95142c9e271d4ef2b0559e8125a92aa08"},
 ]
 loguru = [
     {file = "loguru-0.4.1-py3-none-any.whl", hash = "sha256:074b3caa6748452c1e4f2b302093c94b65d5a4c5a4d7743636b4121e06437b0e"},

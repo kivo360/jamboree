@@ -134,6 +134,7 @@ class BlobStorageHandler(BaseHandler):
         query = self.setup_query(alt)
         # Put settings here
         current_settings = ADict()
+        current_settings.overwrite = is_overwrite
         self.processor.storage.save(query, data, **current_settings.to_dict())
     
 
@@ -144,6 +145,12 @@ class BlobStorageHandler(BaseHandler):
         current_settings = ADict()
         self.processor.storage.save(query, data, **current_settings.to_dict())
     
+    def absolute_exists(self, alt={}):
+        self.check()
+        query = self.setup_query(alt)
+        # Put settings here
+        current_settings = ADict()
+        return self.processor.storage.absolute_exists(query, **current_settings.to_dict())
 
     def last(self, alt={}):
         self.check()

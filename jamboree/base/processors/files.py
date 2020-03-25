@@ -64,7 +64,7 @@ class JamboreeFileProcessor(FileProcessor):
         if not self._validate_query(query):
             raise ValueError("Query isn't valid")
         
-        self.redis_conn.save(query, obj)
+        self.redis_conn.save(query, obj, **kwargs)
     
     def query(self, query:dict, **kwargs):
         if not self._validate_query(query):
@@ -77,6 +77,10 @@ class JamboreeFileProcessor(FileProcessor):
             raise ValueError("Query isn't valid")
         self.redis_conn.delete(query, **kwargs)
 
+    def absolute_exists(self, query: dict, **kwargs):
+        if not self._validate_query(query):
+            raise ValueError("Query isn't valid")
+        return self.redis_conn.absolute_exists(query, **kwargs)
     
     
     
