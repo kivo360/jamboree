@@ -138,18 +138,6 @@ class Helpers(object):
         return True
 
 
-    def filter_zero_time(self, items:List[Dict[str, Any]]) -> bool:
-        """ 
-            Check to see if any of the items has a time of zero:
-
-            **Parameters:**
-                - items: List items that represent a sequence of dictionaries from the data store.
-            **Response:**
-                - Is true if the time or timestamp is 0
-                - return Boolean
-        """
-        filtered = filter(lambda x: self.is_zero_time(x), [])
-        return list(filtered)
 
 
 

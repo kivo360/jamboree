@@ -2,53 +2,42 @@ from abc import ABC
 from typing import List
 
 class FileProcessor(ABC):
-    def save(self, query: dict, data: dict, abs_rel="absolute"):
-        raise NotImplementedError
-
-
-    def save_many(self, query: dict, data: List[dict], abs_rel="absolute"):
-        raise NotImplementedError    
-
-
-    def get_latest(self, query, abs_rel="absolute") -> dict:
-        raise NotImplementedError
-
-
-    def get_latest_many(self, query, abs_rel="absolute", limit=1000):
-        raise NotImplementedError
-
-
-    def get_between(self, query:dict, min_epoch:float, max_epoch:float, abs_rel:str="absolute") -> list:
-        raise NotImplementedError
-
-
-    def get_latest_by(self, query:dict, max_epoch, abs_rel="absolute", limit:int=10) -> dict:
-        raise NotImplementedError
-
-
-    def count(self, query: dict) -> int:
-        raise NotImplementedError
-
-
-    def remove_first(self, query: dict):
-        raise NotImplementedError
-
+    """ 
+        # File processor abstract. 
+        
+        Deals with all blobs and files..
+    """
     
-    def pop_multiple(self, query: dict, limit: int):
+    def initialize(self):
+        pass
+
+    def save(self, query: dict, data: dict, **kwargs):
+        """ Save a single blob of data. """
         raise NotImplementedError
 
+    def save_version(self, query, **kwargs):
+        """ Save a single blob of data at a given version. """
+        raise NotADirectoryError
 
-    def _bulk_save(self, query: dict, data: list):
+    def query(self, query, **kwargs):
+        """ Query a blob of data. Get the latest """
         raise NotImplementedError
 
-
-    def single_get(self, query:dict):
+    def query_version(self, query, **kwargs):
+        """ Save an explicit version of data """
         raise NotImplementedError
 
-
-    def single_set(self, query:dict, data:dict):
+    def delete(self, query, **kwargs):
+        """ Delete the latest version of data """
+        raise NotImplementedError
+    
+    def delete_version(self, query:dict, **kwargs):
+        """ Delete a given version of data if it exist """
         raise NotImplementedError
 
-
-    def single_delete(self, query:dict):
+    def delete_all(self, query:dict, **kwargs):
+        """ Purge everything """
+        raise NotImplementedError
+    
+    def absolute_exists(self, query:dict, **kwargs):
         raise NotImplementedError

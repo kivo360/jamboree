@@ -3,6 +3,9 @@ from typing import List
 
 
 class EventProcessor(ABC):
+    def initialize(self):
+        raise NotImplementedError
+
     def save(self, query: dict, data: dict, abs_rel="absolute"):
         raise NotImplementedError
 

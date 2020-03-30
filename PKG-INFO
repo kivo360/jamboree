@@ -1,0 +1,31 @@
+Metadata-Version: 2.1
+Name: jamboree
+Version: 0.5.2
+Summary: A multi-layer event sourcing and general data library
+Author: Kevin Hill
+Author-email: kah.kevin.hill@gmail.com
+Requires-Python: >=3.7,<4.0
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Requires-Dist: addict (>=2.2.1,<3.0.0)
+Requires-Dist: crayons (>=0.3.0,<0.4.0)
+Requires-Dist: cytoolz (>=0.10.1,<0.11.0)
+Requires-Dist: dill (>=0.3.1,<0.4.0)
+Requires-Dist: funtime (>=0.4.7,<0.5.0)
+Requires-Dist: gym (>=0.17.1,<0.18.0)
+Requires-Dist: json-tricks (>=3.14.0,<4.0.0)
+Requires-Dist: loguru (>=0.4.1,<0.5.0)
+Requires-Dist: lz4 (>=3.0.2,<4.0.0)
+Requires-Dist: maya (>=0.6.1,<0.7.0)
+Requires-Dist: numpy
+Requires-Dist: pandas (>=1.0.3,<2.0.0)
+Requires-Dist: pandas_datareader (>=0.8.1,<0.9.0)
+Requires-Dist: pebble (>=4.5.1,<5.0.0)
+Requires-Dist: pytest (>=5.4.1,<6.0.0)
+Requires-Dist: redis (==3.3.11)
+Requires-Dist: sklearn (>=0.0,<0.1)
+Requires-Dist: torch (>=1.4.0,<2.0.0)
+Requires-Dist: torchvision (>=0.5.0,<0.6.0)
+Requires-Dist: ujson (>=2.0.2,<3.0.0)
+Requires-Dist: version_query (>=1.1.0,<2.0.0)

@@ -1,0 +1,1 @@
+from .fhash import consistent_hash, consistent_unhash, omit
