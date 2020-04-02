@@ -127,24 +127,10 @@ class BacktestBlobHandler(BlobStorageHandler):
     def time(self, _time:'TimeHandler'):
         self._time = _time
 
-    # @property    
-    # def metrics(self):
-    #     self._metrics['name'] = self["name"]
-    #     self._metrics['category'] = self["category"]
-    #     self._metrics['subcategories'] = self["subcategories"]
-    #     self._metrics.episode = self.episode
-    #     self._metrics.live = self.live
-    #     self._metrics.time = self.time
-    #     return self._metrics
-    
-    # @metrics.setter
-    # def metrics(self, _metric: 'MetricHandler'):
-    #     self._metrics = _metric
 
     def reset(self):
         """ Reset the data we're querying for. """
         self.time.reset()
-        # self.metrics.reset()
     
     
     

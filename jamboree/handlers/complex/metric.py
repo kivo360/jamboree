@@ -75,6 +75,11 @@ class MetricHandler(BacktestDBHandler):
         super().reset()
         self.reset_current_metric()
     
+    def step_time(self):
+        """ """
+        self.time.step()
+        pass
+    
     
     
     def __str__(self) -> str:
@@ -95,6 +100,7 @@ def metric_test():
     metric_log['name'] = "general_regressor"
     metric_log.processor = jambo
     metric_log.reset()
+    metric_log.time.change_stepsize(hours=0, microseconds=10)
     while True:
         metric_log.reset_current_metric()
         metric_schema = {
@@ -103,8 +109,8 @@ def metric_test():
         }
         metric_log.log(metric_schema)
         saved_metric = metric_log.latest()
+        metric_log.step_time()
         print(saved_metric)
-    # jam_processor = JamboreeNew()
 
     
 if __name__ == "__main__":

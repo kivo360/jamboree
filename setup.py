@@ -1,33 +1,33 @@
 # -*- coding: utf-8 -*-
-from setuptools import setup
+from setuptools import setup, find_packages
 
-packages = \
-['jamboree',
- 'jamboree.base',
- 'jamboree.base.old',
- 'jamboree.base.processors',
- 'jamboree.base.processors.abstracts',
- 'jamboree.handlers',
- 'jamboree.handlers.abstracted',
- 'jamboree.handlers.abstracted.models',
- 'jamboree.handlers.complex',
- 'jamboree.handlers.default',
- 'jamboree.handlers.processors',
- 'jamboree.storage',
- 'jamboree.storage.databases',
- 'jamboree.storage.files',
- 'jamboree.storage.files.redisify',
- 'jamboree.utils',
- 'jamboree.utils.context',
- 'jamboree.utils.core',
- 'jamboree.utils.procedures',
- 'jamboree.utils.procedures.models',
- 'jamboree.utils.processors',
- 'jamboree.utils.support',
- 'jamboree.utils.support.events',
- 'jamboree.utils.support.metrics',
- 'jamboree.utils.support.search',
- 'jamboree.utils.support.storage']
+# packages = \
+# ['jamboree',
+#  'jamboree.base',
+#  'jamboree.base.old',
+#  'jamboree.base.processors',
+#  'jamboree.base.processors.abstracts',
+#  'jamboree.handlers',
+#  'jamboree.handlers.abstracted',
+#  'jamboree.handlers.abstracted.models',
+#  'jamboree.handlers.complex',
+#  'jamboree.handlers.default',
+#  'jamboree.handlers.processors',
+#  'jamboree.storage',
+#  'jamboree.storage.databases',
+#  'jamboree.storage.files',
+#  'jamboree.storage.files.redisify',
+#  'jamboree.utils',
+#  'jamboree.utils.context',
+#  'jamboree.utils.core',
+#  'jamboree.utils.procedures',
+#  'jamboree.utils.procedures.models',
+#  'jamboree.utils.processors',
+#  'jamboree.utils.support',
+#  'jamboree.utils.support.events',
+#  'jamboree.utils.support.metrics',
+#  'jamboree.utils.support.search',
+#  'jamboree.utils.support.storage']
 
 package_data = \
 {'': ['*']}
@@ -53,7 +53,8 @@ install_requires = \
  'torch>=1.4.0,<2.0.0',
  'torchvision>=0.5.0,<0.6.0',
  'ujson>=2.0.2,<3.0.0',
- 'version_query>=1.1.0,<2.0.0']
+ 'version_query>=1.1.0,<2.0.0', 
+ 'orjson']
 
 setup_kwargs = {
     'name': 'jamboree',
@@ -65,7 +66,7 @@ setup_kwargs = {
     'maintainer': None,
     'maintainer_email': None,
     'url': None,
-    'packages': packages,
+    'packages': find_packages(),
     'package_data': package_data,
     'install_requires': install_requires,
     'python_requires': '>=3.7,<4.0',
