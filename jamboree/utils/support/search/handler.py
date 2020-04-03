@@ -88,18 +88,15 @@ class BaseSearchHandlerSupport(object):
         return name in self.subnames
 
 
+    def is_valid_sub_key_information(self, subkey_dict:dict):
+        """ Check to see if the subkey is valid"""
+        
+        if len(subkey_dict) == 0:
+            return False
+        
 
-    def handle_input_dict_key(self, name:str, item:dict):
-        """ Figures out where to put the input dictionary for the query """
-        if self.is_sub(name):
-            logger.success("This is a subkey")
-        else:
-            # If it's not queryable don't try adding anything
-            if not is_queryable_dict(item):
-                return
-            logger.debug("It's an item we can both query and take values from to insert into the database")
-            self.insert_builder.from_dict(name, item)
-            self.query_builder.from_dict(name, item)
+
+    
             # We'd define a query here
             # Also define what we're adding
 
@@ -131,7 +128,6 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
             if is_generic(_instance_type):
                 _str_type = to_str(_instance_type)
                 self.query_builder.insert_by_type_str(_str_type, key, value)
-                logger.warning(self.query_builder.qset)
             pass
     
 
@@ -153,7 +149,9 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
     @requirements.setter
     def requirements(self, _requirements:dict):
         """If we set it here we'd go through each dict item and create string version of each key"""
+        # Document id will allow us to figure out which documents are involved with subkeys
         _requirements['entity'] = str
+        _requirements['doc_id'] = str
         self.process_requirements(_requirements)
         self.create_sub_handlers()
     
@@ -164,12 +162,26 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
             subhandler.is_sub_key = True
             subhandler.index = subkey
             self.subs[name] = subhandler
-            logger.warning((name, subkey))
-            # print
+
+
+    def handle_input_dict_key(self, name:str, item:dict):
+        """ Figures out where to put the input dictionary for the query """
+        if self.is_sub(name) and (not self.is_sub_key):
+            # If this is a subkey we'll run the same operation again
+            # Check to see if the subkey is empty and has information that is reducible to "type"
+            logger.success("We're able to create a new subkey. We don't allow for more than two layers")
+        else:
+            # If it's not queryable don't try adding anything
+            if not is_queryable_dict(item):
+                return
+            # logger.debug("It's an item we can both query and take values from to insert into the database")
+            self.insert_builder.from_dict(name, item)
+            self.query_builder.from_dict(name, item)
+
 
     def find(self, alt={}):
         """Given the items we've set, find all matching items"""
-        # self.query_builder
+        self.query_builder.build()
     
     def update(self, alt={}):
         """
@@ -209,6 +221,7 @@ class ExampleSearchHandler(BaseSearchHandler):
 def main():
     base_handler = ExampleSearchHandler()
     base_handler['name'] = "Kevin Hill"
+    base_handler['category'] = "markets"
     base_handler['subcategories'] = {
         "country": "US"
     }

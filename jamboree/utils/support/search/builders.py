@@ -166,15 +166,28 @@ class QueryBuilder(object):
         is_exact = current.get('is_exact', False)
         _term = current.get('value', "")
         if is_exact:
-            return f'\"{_term}\"'
-        return _term
+            return f'@{field}:\"{_term}\"'
+        return f"@{field}:{_term}"
 
     def _process_text_filter(self) -> str:
         text_lists = [self._single_text(field) for field in self._text_fields]
-        return " ".join(text_lists)
+        joined = " ".join(text_lists)
+        return joined
+
+
+    def _single_bool(self, field:str) -> str:
+        """ """
+
+        current = self.qset[field]
+        # is_exact = current.get('is_exact', False)
+        _term = current.get('value', "")
+        return f"@{field}:\"{_term}\""
 
     def _process_boolean(self) -> str:
         """ Do an exact match on all boolean values """
+        bool_list = [self._single_bool(field) for field in self._boolean_fields]
+        joined = " ".join(bool_list)
+        return joined
     
     def _process_geo_filter(self) -> str:
         return ""
@@ -228,9 +241,9 @@ class QueryBuilder(object):
         if not item.get("is_filter"):
             logger.debug("We're not creating a search query from this record")
             return
-        logger.success("We are creating a query from this set item")
+        
         _type = str(item.get("type")).upper()
-        # print(_type)
+        
         if _type == "GEO":
             self.convert_geo_dict(name, item)
         elif _type == "BOOL":
@@ -245,6 +258,11 @@ class QueryBuilder(object):
 
     def build(self):
         """Builds a query to be executed"""
+        processed_text = self._process_text_filter()
+        processed_bool = self._process_boolean()
+        joined_query_string = " ".join([processed_text, processed_bool])
+        logger.warning(joined_query_string)
+        # logger.warning(processed_text)
         return ""
 
 
