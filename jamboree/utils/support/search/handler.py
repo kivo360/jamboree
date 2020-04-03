@@ -157,6 +157,7 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
     
 
     def create_sub_handlers(self):
+        """ Creates subhandlers for the given index"""
         for name, subkey in self.subfields.items():
             subhandler = BaseSearchHandler()
             subhandler.is_sub_key = True
