@@ -73,12 +73,20 @@ def to_field(k, v):
         return GeoField(k)
 
 
+
+"""
+    Dictionary Validation
+"""
+
+
+
 def is_valid_geo(_dict:dict):
     """ That we have the appropiate values """
     schema = {
         "long": {"type": "number"},
         "lat": {"type": "number"},
-        "distance": {"type": "number"}
+        "distance": {"type": "number", "required":False},
+        "metric": {"type": "string", "allowed": ["m","km","mi","ft"], "required":False}
     }
     return _global_validator.validate(_dict, schema)
 
@@ -108,7 +116,7 @@ def is_valid_tags(_dict:dict):
 def is_valid_text(_dict:dict):
     schema = {
         "term": {"type": "string"},
-        "is_exact": {"type": "bool"}, 
+        "is_exact": {"type": "boolean", "required":False}, 
     }
     return _global_validator.validate(_dict, schema)
 

@@ -1,3 +1,4 @@
+import uuid
 from typing import Dict
 from loguru import logger
 from jamboree.utils.support.search import (
@@ -47,6 +48,7 @@ class QueryBuilder(object):
     def exact(self, field, num):
         placeholder = {
             "filter": "number",
+            # "operation": "exact",
             "value": {
                 "upper": num,
                 "lower": num
@@ -59,6 +61,7 @@ class QueryBuilder(object):
     def greater(self, field:str, num):
         placeholder = {
             "filter": "number",
+            # "operation": "greater",
             "value": {
                 "upper": "+inf",
                 "lower": num
@@ -72,6 +75,7 @@ class QueryBuilder(object):
     def less(self, field, num):
         placeholder = {
             "filter": "number",
+            # "operation": "less",
             "value": {
                 "upper": num,
                 "lower": "-inf"
@@ -89,6 +93,7 @@ class QueryBuilder(object):
 
         placeholder = {
             "filter": "number",
+            # "operation": "between",
             "value": {
                 "upper": upper,
                 "lower": lower
@@ -127,7 +132,7 @@ class QueryBuilder(object):
         self.qset[field] = placeholder
         return self
     
-    def tags(self, field, tags:list, op="AND"):
+    def tags(self, field, tags:list, op="OR"):
         placeholder = {
             "filter": "tags",
             "operation": op,
@@ -139,6 +144,15 @@ class QueryBuilder(object):
         self.qset[field] = placeholder
         return self
     
+    def within(self, field, _within:list):
+        """ 
+            # WITHIN
+            Essentially a `WHERE x IN` command for SQL
+
+            WHERE x IN ('foo', 'bar','hello world')
+        """
+        pass
+
     def term(self, field, _term:str, is_exact=False):
         placeholder = {
             "filter": "text",
@@ -179,7 +193,6 @@ class QueryBuilder(object):
         """ """
 
         current = self.qset[field]
-        # is_exact = current.get('is_exact', False)
         _term = current.get('value', "")
         return f"@{field}:\"{_term}\""
 
@@ -189,14 +202,57 @@ class QueryBuilder(object):
         joined = " ".join(bool_list)
         return joined
     
+    def _single_geo(self, field:str):
+        """ Turn a geospacial query into a string """
+        current = self.qset[field].get("value")
+
+        lon = current.get("long")
+        lat = current.get("lat")
+        dist = current.get("distance")
+        metric = current.get("metric")
+        _geo = f"@{field}:[{lon} {lat} {dist} {metric}]"
+        return _geo
+
     def _process_geo_filter(self) -> str:
-        return ""
+        geo_list = [self._single_geo(field)  for field in self._geo_fields]
+        joined = " ".join(geo_list)
+        return joined
     
+    def _single_tag(self, field:str):
+        current = self.qset[field]
+        values = current.get("value")
+        _tags = values.get("tags")
+        if len(_tags) == 0:
+            return ""
+        join_val = " | "
+        _joined = join_val.join(_tags)
+
+        _tag_filter = f"@{field}: {{ {_joined} }}"
+        return _tag_filter
+
     def _process_tag_filter(self) -> str:
-        return ""
+        tag_list = [self._single_tag(field) for field in self._tag_fields]
+        joined = " ".join(tag_list)
+        return joined
     
+
+    def _single_num(self, field):
+        current = self.qset[field]
+
+        _value = current.get("value")
+        up = _value.get("upper")
+        down = _value.get("lower")
+        if up == down:
+            return f"@{field}:{up}"
+        
+        return f"@{field}: [{down} {up}]"
+        
+
+
     def _process_number_filter(self):
-        return ""
+        tag_list = [self._single_num(field) for field in self._number_fields]
+        joined = " ".join(tag_list)
+        return joined
     
     """ 
         Convert dictionaries into something we can digest
@@ -220,11 +276,17 @@ class QueryBuilder(object):
     def convert_tags_dict(self, name, _dict):
         pass
     
-    def convert_text_dict(self, name, _dict):
+    def convert_text_dict(self, name:str, _dict:dict):
         """
             1. Check to see if the  dictionary has all of the required components
         """
-        pass
+        values = _dict['values']
+        if not is_valid_text(values):
+            logger.error(values)
+            return
+        _term = values.get("term")
+        _is_exact = values.get("is_exact", False)
+        self.term(field=name, _term=_term, is_exact=_is_exact)
 
     def convert_numeric_dict(self, name, _dict):
         """
@@ -260,10 +322,12 @@ class QueryBuilder(object):
         """Builds a query to be executed"""
         processed_text = self._process_text_filter()
         processed_bool = self._process_boolean()
-        joined_query_string = " ".join([processed_text, processed_bool])
+        processed_num = self._process_number_filter()
+        processed_tags = self._process_tag_filter()
+        processed_geo = self._process_geo_filter()
+        joined_query_string = " ".join([processed_text, processed_tags, processed_num, processed_bool, processed_geo])
         logger.warning(joined_query_string)
-        # logger.warning(processed_text)
-        return ""
+        return joined_query_string
 
 
 class InsertBuilder(object):
@@ -274,12 +338,16 @@ class InsertBuilder(object):
     """
     def __init__(self):
         self._insert_dict = {}
+        self.doc_id = ""
     
     def add_field(self, name, field_type, **values):
         """ Adds a field with the values inside of the kwargs field. Will go through specific formatting."""
         return self
 
     def build(self):
+        """ After all of the dictionaries are set we create a doc_id (for the given index) and we create one"""
+        self.doc_id = uuid.uuid4().hex
+        self._insert_dict['doc_id'] = self.doc_id
         return self._insert_dict
 
     def from_dict(self, name, item:dict):
@@ -288,4 +356,4 @@ class InsertBuilder(object):
 
     def reset(self):
         """ Reset all of the items that are inside of object."""
-        pass
+        self._insert_dict = {}
