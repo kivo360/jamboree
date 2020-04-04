@@ -94,12 +94,18 @@ class BaseSearchHandlerSupport(object):
         if len(subkey_dict) == 0:
             return False
         
-
-
+        
+        # Run validation to see if all of the keys are reducible to a type and base type
+        for k, v in subkey_dict.items():
+            if is_generic(v):
+                continue
+            if isinstance(v, dict):
+                if not is_queryable_dict(v):
+                    logger.error(f"{k} is not valid")
+                    return False
+        return True
     
-            # We'd define a query here
-            # Also define what we're adding
-
+        
 
 
 class BaseSearchHandler(BaseSearchHandlerSupport):
@@ -153,7 +159,8 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
         _requirements['entity'] = str
         _requirements['doc_id'] = str
         self.process_requirements(_requirements)
-        self.create_sub_handlers()
+        if not self.is_sub_key:
+            self.create_sub_handlers()
     
 
     def create_sub_handlers(self):
@@ -167,7 +174,7 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
 
     def handle_input_dict_key(self, name:str, item:dict):
         """ Figures out where to put the input dictionary for the query """
-        if self.is_sub(name) and (not self.is_sub_key):
+        if self.is_sub(name):
             # If this is a subkey we'll run the same operation again
             # Check to see if the subkey is empty and has information that is reducible to "type"
             logger.success("We're able to create a new subkey. We don't allow for more than two layers")
@@ -175,14 +182,25 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
             # If it's not queryable don't try adding anything
             if not is_queryable_dict(item):
                 return
-            # logger.debug("It's an item we can both query and take values from to insert into the database")
+            logger.debug(item)
+
             self.insert_builder.from_dict(name, item)
             self.query_builder.from_dict(name, item)
 
 
     def find(self, alt={}):
         """Given the items we've set, find all matching items"""
+        self['entity'] = {
+            "type": "TEXT",
+            "is_filter": True,
+            "values": {
+                "is_exact": True,
+                "term": self.entity
+            }
+        }
+        
         self.query_builder.build()
+        
     
     def update(self, alt={}):
         """
@@ -213,6 +231,7 @@ class ExampleSearchHandler(BaseSearchHandler):
         self.requirements = {
             "name": str,
             "category": str,
+            "sample_tags": list,
             "subcategories": dict,
             "loc": "GEO",
             "live": bool
@@ -223,6 +242,7 @@ def main():
     base_handler = ExampleSearchHandler()
     base_handler['name'] = "Kevin Hill"
     base_handler['category'] = "markets"
+    base_handler['sample_tags'] = ["one", "two", "three"]
     base_handler['subcategories'] = {
         "country": "US"
     }
