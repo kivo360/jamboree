@@ -1,7 +1,7 @@
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 from typing import Dict, Any
-
+import time
 from jamboree.utils.core import consistent_hash
 from jamboree.utils.support.search import ( QueryBuilder, InsertBuilder,
                                             is_gen_type, is_generic, is_geo,
@@ -286,16 +286,15 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
             }
             self.is_set_entity = True
 
+    # def verbatim_super_id(self):
+    #     q = Query(self.query_builder.build()).paging(0, 1000000)
+    #     results = self.client.search(q)
+    #     result_docs = results.docs
+    #     return result_docs
 
     def verbatim_docs(self):
-        results = self.client.search(self.query_builder.build())
-        if self.print_sub:
-            
-            logger.debug(self.insert_builder.build())
-            logger.debug(self.indexable)
-            logger.info(results.total)
-            logger.success(len(results.docs))
-            print(results.docs)
+        q = Query(self.query_builder.build()).paging(0, 1000000)
+        results = self.client.search(q)
         result_docs = results.docs
         return result_docs
     
@@ -309,7 +308,6 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
                     id_set.add(verb.super_id)
                 except Exception:
                     pass
-        # logger.info(id_set)
         return list(id_set)
 
     def handle_input_dict_key(self, name:str, item:dict):
@@ -331,20 +329,18 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
 
 
     def _normal_find(self, limit_ids=None):
-        q = self.query_builder.build()
+        # logger.success(len(limit_ids))
+        q = Query(self.query_builder.build()).paging(0, 1000000)
         if limit_ids is not None and len(limit_ids) > 0:
-            # print(limit_ids)
-            q = Query(q).limit_ids(*limit_ids)
+            q.limit_ids(*limit_ids)
         results = self.client.search(q)
-        # logger.info(results.total)
         result_docs = results.docs
         return result_docs
     
     def _sub_find(self):
         sub_ids = self.verbatim_sub_ids()
-        # print(sub_ids)
-        # if len(sub_ids) == 0:
-        #     return self._normal_find()
+        if len(sub_ids) == 0:
+            return []
         return self._normal_find(limit_ids=sub_ids)
 
     def find(self, alt={}):
@@ -380,7 +376,6 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
                 # Not adding docs because we're not allowing duplicates
                 return "", False
         insert_variables = self.insert_builder.build()
-        logger.info(insert_variables)
         _doc_id = self.insert_builder.doc_id
         self.client.add_document(_doc_id, payload=_doc_id, **insert_variables)
         return _doc_id, True
@@ -390,7 +385,6 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
         if _did_insert:
             for sub in self.subs.values():
                 sub.insert_builder.super_id = _super_id
-                logger.debug(sub.insert_builder.build())
                 sub._normal_insert(allow_duplicates=True)
 
     def insert(self, alt={}, allow_duplicates=False):
@@ -444,45 +438,28 @@ def main():
     example_handler['name'] = "Boi Gurl"
     example_handler['category'] = "markets"
     example_handler['sample_tags'] = ["one", "two", "three"]
-    # example_handler['rano'] = {
-    #     "type": "NUMERIC",
-    #     "is_filter": True,# example_handler['sample_tags'] = ["one", "two", "three"]
-    # example_handler['rano'] = {
-    #     "type": "NUMERIC",
-    #     "is_filter": True,
-    #     "values": {
-    #         "lower": -1,
-    #         "upper": 34,
-    #         "operation": "between"
-    #     }
-    # }
-    #     "values": {
-    #         "lower": -1,
-    #         "upper": 34,
-    #         "operation": "between"
-    #     }
-    # }
     example_handler['subcategories'] = {
-        # "hello": "world",
         "my": 123,
-        "country": "US"
-    }
-    example_handler['live'] = False
-    example_handler['loc'] = {
-        "type": "GEO",
-        "is_filter": True,
-        "values": {
-            "long": 33.4,
-            "lat": 2.5,
-            "distance": 8000,
-            "metric": "km"
+        "country": "US",
+        "lurk": {
+            "type": "GEO",
+            "is_filter": True,
+            "values": {
+                "long": 35,
+                "lat": 5.4,
+                "distance": 80,
+                "metric": "km"
+            }
         }
     }
+    example_handler['live'] = False
     example_handler.replacement['live'] = True
-    example_handler.insert(allow_duplicates=True)
-    records = example_handler.find()
-    # pprint(records)
-    logger.warning((records, len(records)))
+    start = time.time()
+    for _ in range(10000):
+        example_handler.insert(allow_duplicates=True)
+    # example_handler.find()
+    logger.debug(time.time()-start)
+    # logger.warning((records, len(records)))
 
     # example_handler.insert()
     # records = example_handler.find()
