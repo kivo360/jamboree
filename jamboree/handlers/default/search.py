@@ -9,7 +9,8 @@ from jamboree.utils.support.search import ( QueryBuilder, InsertBuilder,
                                             to_str, is_queryable_dict)
 from loguru import logger
 from cerberus import Validator
-
+from redisearch import Client, Query
+from redis.exceptions import ResponseError
 
 class BaseSearchHandlerSupport(object):
     def __init__(self):
@@ -81,7 +82,8 @@ class BaseSearchHandlerSupport(object):
                 continue
         if not self.is_sub_key:
             self._index_key = consistent_hash(self._requirements_str)
-            self.process_subfields()
+            
+            # self.process_subfields()
 
     def is_sub(self, name:str) -> bool:
         """ Check to see if this is a subfield """
@@ -104,6 +106,11 @@ class BaseSearchHandlerSupport(object):
                     logger.error(f"{k} is not valid")
                     return False
         return True
+
+
+    def reset_builders(self):
+        self.insert_builder = InsertBuilder()
+        self.query_builder = QueryBuilder()
     
         
 
@@ -113,30 +120,42 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
         super().__init__()
         self._entity = None
         # This will only be here as an example
-        
-        
-        
-        
+        self.is_replacement = False
+        self.current_replacement = None
+        self.is_set_entity = False
+                
         # Subs are all of the subfields we would need to search through
         self.subs:Dict[str, BaseSearchHandler] = {}
-        # Replacement is a set of fields we'd place in place of the ones we query or find by id
-        self.replacement = {}
+
+        self.current_doc_id = None
+        self.current_doc_id_list = None
+        self.current_client = None
     
     def __setitem__(self, key:str, value:Any):
-        if key not in self.requirements.keys():
+        if key not in self.requirements.keys() and (not self.is_replacement):
             return
-
+        self.is_set_entity = False
+        self.current_client = None
         if isinstance(value, dict):
             self.handle_input_dict_key(key, value) 
         else:
             _instance_type = type(value)
-            # check tha the value is the right type
+            # check that the value is the right type
+            
+            logger.debug(f"Skipping: {key} - {value}")
             if is_generic(_instance_type):
                 _str_type = to_str(_instance_type)
                 self.query_builder.insert_by_type_str(_str_type, key, value)
-            pass
-    
+                self.insert_builder.insert_by_type_str(_str_type, key, value)
 
+
+    @property
+    def replacement(self):
+        if self.current_replacement is None:
+            self.current_replacement =  BaseSearchHandler()
+            self.current_replacement.is_replacement = True
+            self.current_replacement.insert_builder.is_replacement = True
+        return self.current_replacement
 
     @property
     def entity(self):
@@ -157,11 +176,33 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
         """If we set it here we'd go through each dict item and create string version of each key"""
         # Document id will allow us to figure out which documents are involved with subkeys
         _requirements['entity'] = str
-        _requirements['doc_id'] = str
+        _requirements['document_id'] = str
         self.process_requirements(_requirements)
         if not self.is_sub_key:
             self.create_sub_handlers()
-    
+    @property
+    def doc_id(self):
+        return self.current_doc_id
+
+    @doc_id.setter
+    def doc_id(self, _doc_id:str):
+        self.current_doc_id = _doc_id
+
+
+    @property
+    def verbatim(self):
+        return self.query_builder.build_exact()
+
+    @property
+    def client(self):
+        if self.current_client is None:
+            try:
+                self.current_client = Client(self.index)
+                self.current_client.create_index(self.indexable)
+            except ResponseError:
+                pass
+        return self.current_client
+
 
     def create_sub_handlers(self):
         """ Creates subhandlers for the given index"""
@@ -171,18 +212,34 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
             subhandler.index = subkey
             self.subs[name] = subhandler
 
+    def set_entity(self):
+        if self.is_set_entity is False:
+            self['entity'] = {
+                "type": "TEXT",
+                "is_filter": True,
+                "values": {
+                    "is_exact": True,
+                    "term": self.entity
+                }
+            }
+            self.is_set_entity = True
+
+
+    def verbatim_docs(self):
+        results = self.client.search(self.verbatim)
+        result_docs = results.docs
+        return result_docs
 
     def handle_input_dict_key(self, name:str, item:dict):
         """ Figures out where to put the input dictionary for the query """
         if self.is_sub(name):
             # If this is a subkey we'll run the same operation again
             # Check to see if the subkey is empty and has information that is reducible to "type"
-            logger.success("We're able to create a new subkey. We don't allow for more than two layers")
+            pass
         else:
             # If it's not queryable don't try adding anything
             if not is_queryable_dict(item):
                 return
-            logger.debug(item)
 
             self.insert_builder.from_dict(name, item)
             self.query_builder.from_dict(name, item)
@@ -190,39 +247,70 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
 
     def find(self, alt={}):
         """Given the items we've set, find all matching items"""
-        self['entity'] = {
-            "type": "TEXT",
-            "is_filter": True,
-            "values": {
-                "is_exact": True,
-                "term": self.entity
-            }
-        }
         
-        self.query_builder.build()
+        self.set_entity()
+        qstring = self.query_builder.build()
+        results = self.client.search(qstring)
+        result_docs = results.docs
+        return result_docs
+        
         
     
     def update(self, alt={}):
         """
-            # Update
+            # UPDATE
+
             Given the items or ID we've set, partial update every matching document. 
             If we have the document_ids already, replace those items
         """
-        pass
+        self.set_entity()
+        result_docs = self.verbatim_docs()
+        replacement_variables = self.replacement.insert_builder.build()
+        batcher = self.client.batch_indexer(chunk_size=len(result_docs))
+        for result in result_docs:
+            doc_id = result.id
+            batcher.add_document(doc_id, replace=True, partial=True, **replacement_variables)
+        batcher.commit()
     
-    def insert(self, alt={}):
+    def insert(self, alt={}, allow_duplicates=False):
         """
-            # Insert
+            # INSERT
+
             Given all of the items we've set, add documents
         """
-        pass
+        self.set_entity()
+        
+        verbatim_docs = self.verbatim_docs()
+        if len(verbatim_docs) > 0 and allow_duplicates == False:
+            # Not adding docs because we're not allowing duplicates
+            return
+        insert_variables = self.insert_builder.build()
+        _doc_id = self.insert_builder.doc_id
+
+        self.client.add_document(_doc_id, payload=_doc_id, **insert_variables)
+
+        
     
     def remove(self, alt={}):
-        pass
+        """
+            # REMOVE
+
+            Remove all documents that match a given ID
+        """
+        self.set_entity()
+        results = self.client.search(self.verbatim)
+        result_docs = results.docs
+        for result in result_docs:
+            doc_id = result.id
+            self.client.delete_document(doc_id)
     
     def reset(self):
         """Reset all local variables"""
-        pass
+        self.reset_builders()
+        self.is_set_entity = True
+        self.is_replacement = False
+        self.current_replacement = None
+        self.current_client = None
 
 class ExampleSearchHandler(BaseSearchHandler):
     def __init__(self):
@@ -230,34 +318,52 @@ class ExampleSearchHandler(BaseSearchHandler):
         self.entity = "example"
         self.requirements = {
             "name": str,
+            "rano": float,
             "category": str,
             "sample_tags": list,
-            "subcategories": dict,
             "loc": "GEO",
             "live": bool
         }
 
 
 def main():
-    base_handler = ExampleSearchHandler()
-    base_handler['name'] = "Kevin Hill"
-    base_handler['category'] = "markets"
-    base_handler['sample_tags'] = ["one", "two", "three"]
-    base_handler['subcategories'] = {
-        "country": "US"
+    example_handler = ExampleSearchHandler()
+    example_handler['name'] = "Kevin Hill"
+    example_handler['category'] = "markets"
+    example_handler['sample_tags'] = ["one", "two", "three"]
+    example_handler['rano'] = {
+        "type": "NUMERIC",
+        "is_filter": True,
+        "values": {
+            "lower": -1,
+            "upper": 34,
+            "operation": "between"
+        }
     }
-    base_handler['live'] = False
-    base_handler['loc'] = {
+    example_handler['live'] = False
+    example_handler['loc'] = {
         "type": "GEO",
         "is_filter": True,
         "values": {
-            "long": 33,
-            "lat": -10,
-            "distance": 1.2,
+            "long": 33.4,
+            "lat": 2.5,
+            "distance": 8000,
             "metric": "km"
         }
     }
-    base_handler.find()
+    example_handler.replacement['live'] = True
+    example_handler.insert()
+    records = example_handler.find()
+    logger.warning((records, len(records)))
+
+    example_handler.insert()
+    records = example_handler.find()
+    logger.debug((records, len(records)))
+
+    example_handler.insert(allow_duplicates=True)
+    records = example_handler.find()
+    logger.error((records, len(records)))
+
 
 
 if __name__ == "__main__":
