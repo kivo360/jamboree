@@ -47,16 +47,12 @@ def to_str(i):
     """Converts the item to a string version of it"""
     if i == bool:
         # This will be text that we'll force exact queries on
-        # self.arr.add(TextField(k, no_stem=True))
         return "BOOL"
     elif i == float or i == int:
-        # self.arr.add(NumericField(k))
         return "NUMERIC"
     elif i == str:
-        # self.arr.add(TextField(k))
         return "TEXT"
     elif i == list:
-        # self.arr.add(TagField(k))
         return "TAG"
 
 
@@ -100,7 +96,7 @@ def is_valid_bool(_dict:dict):
 def is_valid_numeric(_dict:dict):
     """ That we have the appropiate values to do a numeric query """
     schema = {
-        "operation": {"type": "string", "allowed": ['greater', 'lesser', 'between']},
+        "operation": {"type": "string", "allowed": ['greater', 'lesser', 'between', 'exact']},
         "upper": {"type": "number"}, 
         "lower": {"type": "number"}
     }

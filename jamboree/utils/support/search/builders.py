@@ -4,6 +4,7 @@ from loguru import logger
 from jamboree.utils.support.search import (
     is_valid_geo, is_valid_bool, is_valid_numeric, is_valid_tags, is_valid_text
 )
+from jamboree.utils.support.search.assistance import inserter
 
 class QueryBuilder(object):
     """
@@ -28,6 +29,8 @@ class QueryBuilder(object):
         self.geo_query = {
 
         }
+        self.all_exact = False
+        self.super_id = None
 
     @property
     def qset(self) -> dict:
@@ -179,7 +182,7 @@ class QueryBuilder(object):
         current = self.qset[field]
         is_exact = current.get('is_exact', False)
         _term = current.get('value', "")
-        if is_exact:
+        if is_exact or self.all_exact:
             return f'@{field}:\"{_term}\"'
         return f"@{field}:{_term}"
 
@@ -224,7 +227,7 @@ class QueryBuilder(object):
         _tags = values.get("tags")
         if len(_tags) == 0:
             return ""
-        join_val = " | "
+        join_val = "|"
         _joined = join_val.join(_tags)
 
         _tag_filter = f"@{field}: {{ {_joined} }}"
@@ -243,7 +246,7 @@ class QueryBuilder(object):
         up = _value.get("upper")
         down = _value.get("lower")
         if up == down:
-            return f"@{field}:{up}"
+            return f"@{field}:[{up} {up}]"
         
         return f"@{field}: [{down} {up}]"
         
@@ -288,13 +291,28 @@ class QueryBuilder(object):
         _is_exact = values.get("is_exact", False)
         self.term(field=name, _term=_term, is_exact=_is_exact)
 
-    def convert_numeric_dict(self, name, _dict):
+    def convert_numeric_dict(self, name:str, _dict:dict):
         """
             1. Check to see which kind of query we're doing: greater, lesser, between
             2. Check to see if we have dictionary values required to form a query based on each
             3. If it fits, we'd create a query using the above functions 
         """
-        pass
+        values = _dict['values']
+        if not is_valid_numeric(values):
+            logger.error(values)
+            return
+        _operation = values.get("operation")
+        _up = values.get("upper", 0)
+        _low = values.get("lower", 0)
+
+        if _operation == "greater":
+            self.greater(name, _low)
+        elif _operation == "lesser":
+            self.less(name, _up)
+        elif _operation == "between":
+            self.between(name, _up, _low)
+        elif _operation == "exact":
+            self.exact(name, _low)
 
 
     def from_dict(self, name:str, item:dict):
@@ -326,9 +344,13 @@ class QueryBuilder(object):
         processed_tags = self._process_tag_filter()
         processed_geo = self._process_geo_filter()
         joined_query_string = " ".join([processed_text, processed_tags, processed_num, processed_bool, processed_geo])
-        logger.warning(joined_query_string)
         return joined_query_string
 
+    def build_exact(self):
+        self.all_exact = True
+        processed = self.build()
+        self.all_exact = False
+        return processed
 
 class InsertBuilder(object):
     """
@@ -339,21 +361,101 @@ class InsertBuilder(object):
     def __init__(self):
         self._insert_dict = {}
         self.doc_id = ""
-    
+        self.is_replacement = False
+        self.is_sub = False
+        self.super_id = None
+
+
     def add_field(self, name, field_type, **values):
         """ Adds a field with the values inside of the kwargs field. Will go through specific formatting."""
         return self
 
+
+    
+    def boolean(self, field:str, is_true=False):
+        new_field = inserter.boolean_process(field, is_true=is_true)
+        self._insert_dict.update(new_field)
+        return self
+    
+    def tags(self, field, tags:list, op="OR"):
+        new_field = inserter.list_process(field, tags)
+        self._insert_dict.update(new_field)
+        return self
+    
+    def within(self, field, _within:list):
+        """ 
+            # WITHIN
+            Essentially a `WHERE x IN` command for SQL
+
+            WHERE x IN ('foo', 'bar','hello world')
+        """
+        pass
+
+    def term(self, field, _term:str, is_exact=False):
+        new_field = inserter.text_process(field, _term, is_exact)
+        self._insert_dict.update(new_field)
+        return self
+
+    
+
+    def exact(self, field:str, num):
+        """ Set's an exact number """
+        self._insert_dict[field] = num
+        return self
+  
+
+
+    def convert_geo_dict(self, name:str, item:dict):
+        new_item = inserter.geo_process_dict(name, item)
+        self._insert_dict.update(new_item)
+
+    def convert_text_dict(self, name:str, item:dict):
+        new_item = inserter.text_process_dict(name, item)
+        self._insert_dict.update(new_item)
+    
+
+    def convert_numeric_dict(self, name:str, item:dict):
+        new_item = inserter.num_process_dict(name, item)
+        self._insert_dict.update(new_item)
+
+
+    def from_dict(self, name:str, item:dict):
+        """ Get the values from the dictionary for something that's insertable. """
+        if not item.get("is_filter"):
+            logger.debug("We're not creating a search query from this record")
+            return
+        
+        # logger.debug(item)
+        _type = str(item.get("type")).upper()
+        
+        if _type == "GEO":
+            self.convert_geo_dict(name, item)
+        elif _type == "TEXT":
+            self.convert_text_dict(name, item)
+        else:
+            self.convert_numeric_dict(name, item)
+
+    def insert_by_type_str(self, _type_str:str, field:str, value):
+        if _type_str == "BOOL":
+            self.boolean(field, is_true=value)
+        elif _type_str == "NUMERIC":
+            self.exact(field, value)
+        elif _type_str == "TEXT":
+            self.term(field, value)
+        elif _type_str == "TAG":
+            self.tags(field, value)
+
+
+
     def build(self):
         """ After all of the dictionaries are set we create a doc_id (for the given index) and we create one"""
+        # if 
         self.doc_id = uuid.uuid4().hex
-        self._insert_dict['doc_id'] = self.doc_id
+        if self.super_id is not None:
+            self._insert_dict['super_id'] = self.super_id
         return self._insert_dict
-
-    def from_dict(self, name, item:dict):
-        """ Get the values from the dictionary for something that's insertable. """
-        pass
 
     def reset(self):
         """ Reset all of the items that are inside of object."""
         self._insert_dict = {}
+        self.super_id = None
