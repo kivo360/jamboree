@@ -30,6 +30,7 @@ class QueryBuilder(object):
 
         }
         self.all_exact = False
+        self.super_id = None
 
     @property
     def qset(self) -> dict:
@@ -245,7 +246,7 @@ class QueryBuilder(object):
         up = _value.get("upper")
         down = _value.get("lower")
         if up == down:
-            return f"@{field}:{up}"
+            return f"@{field}:[{up} {up}]"
         
         return f"@{field}: [{down} {up}]"
         
@@ -361,6 +362,8 @@ class InsertBuilder(object):
         self._insert_dict = {}
         self.doc_id = ""
         self.is_replacement = False
+        self.is_sub = False
+        self.super_id = None
 
 
     def add_field(self, name, field_type, **values):
@@ -446,11 +449,13 @@ class InsertBuilder(object):
 
     def build(self):
         """ After all of the dictionaries are set we create a doc_id (for the given index) and we create one"""
-        if not self.is_replacement:
-            self.doc_id = uuid.uuid4().hex
-            self._insert_dict['document_id'] = self.doc_id
+        # if 
+        self.doc_id = uuid.uuid4().hex
+        if self.super_id is not None:
+            self._insert_dict['super_id'] = self.super_id
         return self._insert_dict
 
     def reset(self):
         """ Reset all of the items that are inside of object."""
         self._insert_dict = {}
+        self.super_id = None

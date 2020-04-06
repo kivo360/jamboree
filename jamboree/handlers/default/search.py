@@ -10,6 +10,7 @@ from jamboree.utils.support.search import ( QueryBuilder, InsertBuilder,
 from loguru import logger
 from cerberus import Validator
 from redisearch import Client, Query
+from pprint import pprint
 from redis.exceptions import ResponseError
 
 class BaseSearchHandlerSupport(object):
@@ -82,13 +83,17 @@ class BaseSearchHandlerSupport(object):
                 continue
         if not self.is_sub_key:
             self._index_key = consistent_hash(self._requirements_str)
-            
-            # self.process_subfields()
+            self.process_subfields()
 
     def is_sub(self, name:str) -> bool:
         """ Check to see if this is a subfield """
         return name in self.subnames
 
+    def is_queryable(self, _dict):
+        if isinstance(_dict, dict):
+            if is_queryable_dict(_dict):
+                return True
+        return False
 
     def is_valid_sub_key_information(self, subkey_dict:dict):
         """ Check to see if the subkey is valid"""
@@ -106,6 +111,40 @@ class BaseSearchHandlerSupport(object):
                     logger.error(f"{k} is not valid")
                     return False
         return True
+
+    def queryable_to_type(self, _dict:dict):
+        """ Converts a queryable dictionary into a type"""
+        dtype = _dict['type']
+        if dtype == "GEO":
+            return "GEO"
+        elif dtype == "TEXT":
+            return str
+        elif dtype == "BOOL":
+            return bool
+        elif dtype == "NUMERIC":
+            return float        
+        elif dtype == "TAG":
+            return list
+
+    def loaded_dict_to_requirements(self, _dict:dict):
+        """ 
+            # Loaded Dict To Requirements
+            
+            Convert a dictionary into a requirements dict. 
+
+            Use to create a requirements
+
+            Returns an empty dict if nothing is there.
+        """
+        req = {}
+        for k, v in _dict.items():
+            _ktype = type(v)
+            if is_generic(_ktype):
+                req[k] = _ktype
+            if self.is_queryable(v):
+                req[k] = self.queryable_to_type(v)
+                
+        return req
 
 
     def reset_builders(self):
@@ -130,6 +169,8 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
         self.current_doc_id = None
         self.current_doc_id_list = None
         self.current_client = None
+        self.use_sub_query = False
+        self.print_sub = False
     
     def __setitem__(self, key:str, value:Any):
         if key not in self.requirements.keys() and (not self.is_replacement):
@@ -137,12 +178,13 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
         self.is_set_entity = False
         self.current_client = None
         if isinstance(value, dict):
+            if len(value) == 0:
+                return
+            self.use_sub_query = True
             self.handle_input_dict_key(key, value) 
         else:
             _instance_type = type(value)
             # check that the value is the right type
-            
-            logger.debug(f"Skipping: {key} - {value}")
             if is_generic(_instance_type):
                 _str_type = to_str(_instance_type)
                 self.query_builder.insert_by_type_str(_str_type, key, value)
@@ -175,6 +217,7 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
     def requirements(self, _requirements:dict):
         """If we set it here we'd go through each dict item and create string version of each key"""
         # Document id will allow us to figure out which documents are involved with subkeys
+        
         _requirements['entity'] = str
         _requirements['document_id'] = str
         self.process_requirements(_requirements)
@@ -195,13 +238,31 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
 
     @property
     def client(self):
+        
         if self.current_client is None:
             try:
                 self.current_client = Client(self.index)
                 self.current_client.create_index(self.indexable)
             except ResponseError:
                 pass
+        
+        if self.is_sub_key:
+            for i in self.indexable:
+                try:
+                    self.current_client.alter_schema_add([i])
+                except ResponseError as res:
+                    pass
         return self.current_client
+
+    
+    @property
+    def subinserts(self):
+        """
+            # SUBINSERT Dicts
+            
+            Gets the insert dictionaries for the given
+        """
+        pass
 
 
     def create_sub_handlers(self):
@@ -210,6 +271,7 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
             subhandler = BaseSearchHandler()
             subhandler.is_sub_key = True
             subhandler.index = subkey
+            subhandler.insert_builder.is_sub = True
             self.subs[name] = subhandler
 
     def set_entity(self):
@@ -226,16 +288,39 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
 
 
     def verbatim_docs(self):
-        results = self.client.search(self.verbatim)
+        results = self.client.search(self.query_builder.build())
+        if self.print_sub:
+            
+            logger.debug(self.insert_builder.build())
+            logger.debug(self.indexable)
+            logger.info(results.total)
+            logger.success(len(results.docs))
+            print(results.docs)
         result_docs = results.docs
         return result_docs
+    
+    def verbatim_sub_ids(self):
+        id_set = set()
+        for sub in self.subs.values():
+            sub.print_sub = True
+            verb_items = sub.verbatim_docs()
+            for verb in verb_items:
+                try:
+                    id_set.add(verb.super_id)
+                except Exception:
+                    pass
+        # logger.info(id_set)
+        return list(id_set)
 
     def handle_input_dict_key(self, name:str, item:dict):
         """ Figures out where to put the input dictionary for the query """
         if self.is_sub(name):
             # If this is a subkey we'll run the same operation again
             # Check to see if the subkey is empty and has information that is reducible to "type"
-            pass
+            reqs = self.loaded_dict_to_requirements(item)
+            self.subs[name].requirements = reqs
+            for k, v in item.items():
+                self.subs[name][k] = v
         else:
             # If it's not queryable don't try adding anything
             if not is_queryable_dict(item):
@@ -245,14 +330,30 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
             self.query_builder.from_dict(name, item)
 
 
+    def _normal_find(self, limit_ids=None):
+        q = self.query_builder.build()
+        if limit_ids is not None and len(limit_ids) > 0:
+            # print(limit_ids)
+            q = Query(q).limit_ids(*limit_ids)
+        results = self.client.search(q)
+        # logger.info(results.total)
+        result_docs = results.docs
+        return result_docs
+    
+    def _sub_find(self):
+        sub_ids = self.verbatim_sub_ids()
+        # print(sub_ids)
+        # if len(sub_ids) == 0:
+        #     return self._normal_find()
+        return self._normal_find(limit_ids=sub_ids)
+
     def find(self, alt={}):
         """Given the items we've set, find all matching items"""
         
         self.set_entity()
-        qstring = self.query_builder.build()
-        results = self.client.search(qstring)
-        result_docs = results.docs
-        return result_docs
+        return self._sub_find()
+        
+        # return result_docs
         
         
     
@@ -272,6 +373,26 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
             batcher.add_document(doc_id, replace=True, partial=True, **replacement_variables)
         batcher.commit()
     
+    def _normal_insert(self, allow_duplicates=False):
+        if allow_duplicates == False:
+            verbatim_docs = self.verbatim_docs()
+            if len(verbatim_docs) > 0 and allow_duplicates == False:
+                # Not adding docs because we're not allowing duplicates
+                return "", False
+        insert_variables = self.insert_builder.build()
+        logger.info(insert_variables)
+        _doc_id = self.insert_builder.doc_id
+        self.client.add_document(_doc_id, payload=_doc_id, **insert_variables)
+        return _doc_id, True
+
+    def _sub_insert(self, allow_duplicates=False):
+        _super_id, _did_insert = self._normal_insert(allow_duplicates=allow_duplicates)
+        if _did_insert:
+            for sub in self.subs.values():
+                sub.insert_builder.super_id = _super_id
+                logger.debug(sub.insert_builder.build())
+                sub._normal_insert(allow_duplicates=True)
+
     def insert(self, alt={}, allow_duplicates=False):
         """
             # INSERT
@@ -280,14 +401,7 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
         """
         self.set_entity()
         
-        verbatim_docs = self.verbatim_docs()
-        if len(verbatim_docs) > 0 and allow_duplicates == False:
-            # Not adding docs because we're not allowing duplicates
-            return
-        insert_variables = self.insert_builder.build()
-        _doc_id = self.insert_builder.doc_id
-
-        self.client.add_document(_doc_id, payload=_doc_id, **insert_variables)
+        self._sub_insert(allow_duplicates=allow_duplicates)
 
         
     
@@ -318,27 +432,40 @@ class ExampleSearchHandler(BaseSearchHandler):
         self.entity = "example"
         self.requirements = {
             "name": str,
-            "rano": float,
             "category": str,
-            "sample_tags": list,
-            "loc": "GEO",
-            "live": bool
+            "subcategories": dict,
+            "live": bool,
+            "loc": "GEO"
         }
 
 
 def main():
     example_handler = ExampleSearchHandler()
-    example_handler['name'] = "Kevin Hill"
+    example_handler['name'] = "Boi Gurl"
     example_handler['category'] = "markets"
     example_handler['sample_tags'] = ["one", "two", "three"]
-    example_handler['rano'] = {
-        "type": "NUMERIC",
-        "is_filter": True,
-        "values": {
-            "lower": -1,
-            "upper": 34,
-            "operation": "between"
-        }
+    # example_handler['rano'] = {
+    #     "type": "NUMERIC",
+    #     "is_filter": True,# example_handler['sample_tags'] = ["one", "two", "three"]
+    # example_handler['rano'] = {
+    #     "type": "NUMERIC",
+    #     "is_filter": True,
+    #     "values": {
+    #         "lower": -1,
+    #         "upper": 34,
+    #         "operation": "between"
+    #     }
+    # }
+    #     "values": {
+    #         "lower": -1,
+    #         "upper": 34,
+    #         "operation": "between"
+    #     }
+    # }
+    example_handler['subcategories'] = {
+        # "hello": "world",
+        "my": 123,
+        "country": "US"
     }
     example_handler['live'] = False
     example_handler['loc'] = {
@@ -352,17 +479,18 @@ def main():
         }
     }
     example_handler.replacement['live'] = True
-    example_handler.insert()
-    records = example_handler.find()
-    logger.warning((records, len(records)))
-
-    example_handler.insert()
-    records = example_handler.find()
-    logger.debug((records, len(records)))
-
     example_handler.insert(allow_duplicates=True)
     records = example_handler.find()
-    logger.error((records, len(records)))
+    # pprint(records)
+    logger.warning((records, len(records)))
+
+    # example_handler.insert()
+    # records = example_handler.find()
+    # logger.debug((records, len(records)))
+
+    # example_handler.insert(allow_duplicates=True)
+    # records = example_handler.find()
+    # logger.error((records, len(records)))
 
 
 
