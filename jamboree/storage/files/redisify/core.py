@@ -215,7 +215,7 @@ class RedisFileConnection(FileStorageConnection):
     def setup(self, query:dict, **kwargs):
         if self.setup_run is None:
             self.reset()
-            self.settings = kwargs
+            self.settings = Dict(**kwargs)
             self.current_query = query
             self.gwatch()
             self.version

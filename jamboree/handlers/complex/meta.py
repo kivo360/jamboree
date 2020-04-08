@@ -4,6 +4,7 @@ from loguru import logger
 import maya
 from jamboree.handlers.default import DBHandler
 from jamboree import Jamboree
+from jamboree.handlers.abstracted.search import MetadataSearchHandler
 
 class MetaHandler(DBHandler):
     """ 
@@ -52,11 +53,37 @@ class MetaHandler(DBHandler):
     def __init__(self):
         super().__init__()
         self.entity = "metadata"
-        self.required = {}
+        self.required = {
+            "name": str,
+            "category": str,
+            "subtype": str,
+            "subcategories": dict
+        }
+        self._search = MetadataSearchHandler()
+    
+    @property
+    def search(self):
+        subtype = self['subtype']
+        self._search.processor = self.processor
+        self._search.entity = self.entity
+        self._search['subtype'] = {
+            "type": "TEXT",
+            "is_filter": True,
+            "values": {
+                "is_exact": True,
+                "term": subtype
+            }
+        }
+        self._search['name'] = self['name']
+        self._search['category'] = self['category']
+        self._search['subcategories'] = self['subcategories']
+        return self._search
+
     
     
     def reset(self):
-        logger.info("Reset information here")
+        self.check()
+        self.search.insert(allow_duplicates=False)
     
 
 

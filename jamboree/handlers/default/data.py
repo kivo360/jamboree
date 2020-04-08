@@ -1,6 +1,5 @@
 import uuid
 from loguru import logger
-from crayons import magenta
 
 import maya
 import pandas as pd
@@ -12,6 +11,7 @@ from jamboree.handlers.default.db import DBHandler
 from jamboree.handlers.complex.meta import MetaHandler
 from jamboree.handlers.default.time import TimeHandler
 from jamboree.handlers.processors import DynamicResample, DataProcessorsAbstract
+from jamboree.handlers.abstracted.search import MetadataSearchHandler
 
 class DataHandler(DBHandler):
     """ 
@@ -32,18 +32,22 @@ class DataHandler(DBHandler):
     def __init__(self):
         super().__init__()
         self.entity = "data_management"
+
         self.required = {
+            "name": str,
             "category": str,
             "subcategories": dict,
-            "name": str,
+            "subtype": str
         }
         self._time:TimeHandler = TimeHandler()
         self._meta:MetaHandler = MetaHandler()
+        self._metasearch = MetadataSearchHandler()
         self._episode = uuid.uuid4().hex
         self._is_live = False
         self._preprocessor:DataProcessorsAbstract = DynamicResample("data")
-        self.is_event = False # use to make sure there's absolutely no duplicate data
-    
+        self.is_event = False # use to make sure there's absolutely no duplicate data 
+        self['subtype'] = "data" 
+
     @property
     def episode(self) -> str:
         return self._episode
@@ -74,12 +78,31 @@ class DataHandler(DBHandler):
     
     @property
     def metadata(self):
-        self._meta.event = self.event
+        self._meta.processor = self.processor
+        self._meta['name'] = self['name']
         self._meta['category'] = self['category']
-        self._meta.subcategories = self['subcategories']
-        self._meta.name = self['name']
+        self._meta['subcategories'] = self['subcategories']
+        self._meta['subtype'] = self['subtype']
         return self._meta
     
+
+    @property
+    def search(self):
+        self._metasearch.reset()
+        self._metasearch['subtype'] = self.subtypedict
+        return self._metasearch
+    @property
+    def subtypedict(self):
+        subtype = self['subtype']
+        return {
+            "type": "TEXT",
+            "is_filter": True,
+            "values": {
+                "is_exact": True,
+                "term": subtype
+            }
+        }
+
     @property
     def is_next(self) -> bool:
         """ A boolean that determines if there's anything next """
@@ -117,6 +140,14 @@ class DataHandler(DBHandler):
         if is_bar == True:
             storable_list = self.main_helper.standardize_outputs(storable_list)
         self.save_many(storable_list)
+    
+    def add_now(self, data_dict:dict, is_bar=False):
+        """ Add information to the current dataset"""
+        data_dict_list = [data_dict]
+        if is_bar == True:
+            data_dict_list = self.main_helper.standardize_outputs(data_dict_list)
+        self.save_many(data_dict_list)
+
 
     def dataframe_from_head(self):
         """ Get a dataframe between a head and tail. Resample according to our settings"""
@@ -194,6 +225,6 @@ if __name__ == "__main__":
 
     
     while data_hander.is_next:
-        logger.info(magenta(data_hander.time.head, bold=True))
+        logger.debug(data_hander.time.head)
         print(data_hander.dataframe_from_head())
         data_hander.time.step()

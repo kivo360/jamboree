@@ -189,6 +189,7 @@ class QueryBuilder(object):
     def _process_text_filter(self) -> str:
         text_lists = [self._single_text(field) for field in self._text_fields]
         joined = " ".join(text_lists)
+        joined = joined.strip()
         return joined
 
 
@@ -229,14 +230,15 @@ class QueryBuilder(object):
             return ""
         join_val = "|"
         _joined = join_val.join(_tags)
-
+        _joined = _joined.strip()
         _tag_filter = f"@{field}: {{ {_joined} }}"
         return _tag_filter
 
     def _process_tag_filter(self) -> str:
         tag_list = [self._single_tag(field) for field in self._tag_fields]
         joined = " ".join(tag_list)
-        return joined
+        trimmed = joined.strip()
+        return trimmed
     
 
     def _single_num(self, field):
@@ -350,7 +352,7 @@ class QueryBuilder(object):
         self.all_exact = True
         processed = self.build()
         self.all_exact = False
-        return processed
+        return processed.strip()
 
 class InsertBuilder(object):
     """
