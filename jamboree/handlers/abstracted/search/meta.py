@@ -22,7 +22,8 @@ class MetadataSearchHandler(BaseSearchHandler):
             # strategy, data, model, metainfo (metadata about metadata) are the clear items in mind
             "metatype": str,
             # another identifiable metatype to narrow down results
-            # pricing(data), economic, batch (models), online (models), micro (strategies), macro (strategies), supporting_group
+            # pricing(data), economic, weather (data), social(data), political (data), features (data)
+            # batch (models), online (models), micro (strategies), macro (strategies), supporting_group (complex)
             "submetatype": str,
             "category": str,
             "subcategories": dict,

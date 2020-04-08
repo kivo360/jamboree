@@ -19,7 +19,7 @@ class PriceData(DataHandler):
     def __init__(self):
         super().__init__()
         self['category'] = "markets"
-
+        self['submetatype'] = "price"
         self.sc = "subcategories" # storing the placeholder key to prevent misspelling
         self.cat = "category" # storing variable placeholder key to prevent misspelling
 
@@ -62,6 +62,7 @@ class PriceData(DataHandler):
         _search[self.cat] = "markets"
         _search[self.sc] = {
             "country": country,
+            # "data"
         }
         return _search.find()
     

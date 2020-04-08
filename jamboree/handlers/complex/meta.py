@@ -56,27 +56,37 @@ class MetaHandler(DBHandler):
         self.required = {
             "name": str,
             "category": str,
-            "subtype": str,
+            "metatype": str,
+            "submetatype": str,
             "subcategories": dict
         }
         self._search = MetadataSearchHandler()
     
     @property
     def search(self):
-        subtype = self['subtype']
-        self._search.processor = self.processor
+        metatype = self['metatype']
+        submetatype = self['submetatype']
         self._search.entity = self.entity
-        self._search['subtype'] = {
+        self._search['metatype'] = {
             "type": "TEXT",
             "is_filter": True,
             "values": {
                 "is_exact": True,
-                "term": subtype
+                "term": metatype
+            }
+        }
+        self._search['submetatype'] = {
+            "type": "TEXT",
+            "is_filter": True,
+            "values": {
+                "is_exact": True,
+                "term": submetatype
             }
         }
         self._search['name'] = self['name']
         self._search['category'] = self['category']
         self._search['subcategories'] = self['subcategories']
+        self._search.processor = self.processor
         return self._search
 
     

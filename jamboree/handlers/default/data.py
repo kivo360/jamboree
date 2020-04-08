@@ -37,7 +37,7 @@ class DataHandler(DBHandler):
             "name": str,
             "category": str,
             "subcategories": dict,
-            "subtype": str
+            "metatype": str
         }
         self._time:TimeHandler = TimeHandler()
         self._meta:MetaHandler = MetaHandler()
@@ -46,7 +46,7 @@ class DataHandler(DBHandler):
         self._is_live = False
         self._preprocessor:DataProcessorsAbstract = DynamicResample("data")
         self.is_event = False # use to make sure there's absolutely no duplicate data 
-        self['subtype'] = "data" 
+        self['metatype'] = "data" 
 
     @property
     def episode(self) -> str:
@@ -82,7 +82,7 @@ class DataHandler(DBHandler):
         self._meta['name'] = self['name']
         self._meta['category'] = self['category']
         self._meta['subcategories'] = self['subcategories']
-        self._meta['subtype'] = self['subtype']
+        self._meta['metatype'] = self['metatype']
         return self._meta
     
 
