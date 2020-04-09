@@ -11,7 +11,7 @@ from jamboree.utils.support.search import querying
 # from jamboree.handlers.abstracted.search.meta import MetaDataSearchHandler
 class OrderbookData(DataHandler):
     """
-        # Price Data
+        # Orderbook Data
         
         A way to browse and interact with price data. Is an extension of DataHandler and includes basic searches.
 
@@ -97,6 +97,8 @@ class OrderbookData(DataHandler):
         _search[self.cat] = "markets"
         _search["name"] = name
         return _search.find()
+    
+    
     
     def multi_part_search(self, name=None, country=None, sector=None, market=None, exchange=None):
         """  """

@@ -34,7 +34,7 @@ class Keystore(object):
     
 
     def add(self, superid:str, key:str, _dict:dict):
-        # _dict.pop("super_id", None) 
+        _dict.pop("super_id", None) 
         _dict.pop("id", None)
         _dict.pop("payload", None)
 

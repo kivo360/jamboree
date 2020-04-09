@@ -8,6 +8,8 @@ from jamboree.handlers.base import BaseHandler
 from jamboree.utils.helper import Helpers
 import ujson
 
+from loguru import logger
+
 
 class DBHandler(BaseHandler):
     """ 

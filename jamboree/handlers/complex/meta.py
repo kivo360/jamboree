@@ -58,6 +58,7 @@ class MetaHandler(DBHandler):
             "category": str,
             "metatype": str,
             "submetatype": str,
+            "abbreviation": str,
             "subcategories": dict
         }
         self._search = MetadataSearchHandler()
@@ -86,9 +87,13 @@ class MetaHandler(DBHandler):
         self._search['name'] = self['name']
         self._search['category'] = self['category']
         self._search['subcategories'] = self['subcategories']
+        self._search['abbreviation'] = self['abbreviation']
         self._search.processor = self.processor
         return self._search
 
+    def access_search(self):
+        """ Knowledge of who touched what """
+        pass
     
     
     def reset(self):

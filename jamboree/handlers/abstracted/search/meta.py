@@ -10,7 +10,7 @@ class MetadataSearchHandler(BaseSearchHandler):
         1. Strategy
         2. Data
         3. Model
-        4. Feature
+        4. Meta
 
     """
     def __init__(self):
@@ -29,7 +29,9 @@ class MetadataSearchHandler(BaseSearchHandler):
             "subcategories": dict,
             "description": str,
             "info": dict,
+            # The location about the information involved
             "location": "GEO",
+            "abbreviation": str
         }
     
     

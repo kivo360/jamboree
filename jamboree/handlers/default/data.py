@@ -13,6 +13,8 @@ from jamboree.handlers.default.time import TimeHandler
 from jamboree.handlers.processors import DynamicResample, DataProcessorsAbstract
 from jamboree.handlers.abstracted.search import MetadataSearchHandler
 
+from jamboree.utils.support.search import querying
+
 class DataHandler(DBHandler):
     """ 
         # DATA HANDLER
@@ -31,13 +33,15 @@ class DataHandler(DBHandler):
 
     def __init__(self):
         super().__init__()
-        self.entity = "data_management"
+        self.entity = "data"
 
         self.required = {
             "name": str,
             "category": str,
             "subcategories": dict,
-            "metatype": str
+            "metatype": str,
+            "submetatype":str,
+            "abbreviation": str
         }
         self._time:TimeHandler = TimeHandler()
         self._meta:MetaHandler = MetaHandler()
@@ -46,7 +50,7 @@ class DataHandler(DBHandler):
         self._is_live = False
         self._preprocessor:DataProcessorsAbstract = DynamicResample("data")
         self.is_event = False # use to make sure there's absolutely no duplicate data 
-        self['metatype'] = "data" 
+        self['metatype'] = self.entity
 
     @property
     def episode(self) -> str:
@@ -83,25 +87,19 @@ class DataHandler(DBHandler):
         self._meta['category'] = self['category']
         self._meta['subcategories'] = self['subcategories']
         self._meta['metatype'] = self['metatype']
+        self._meta['submetatype'] = self['submetatype']
+        self._meta['abbreviation'] = self['abbreviation']
         return self._meta
     
 
     @property
     def search(self):
         self._metasearch.reset()
-        self._metasearch['subtype'] = self.subtypedict
+        self._metasearch['category'] = querying.text.exact(self['category'])
+        self._metasearch['metatype'] = querying.text.exact(self['metatype'])
+        self._metasearch['submetatype'] = querying.text.exact(self['submetatype'])
+        self._metasearch.processor = self.processor
         return self._metasearch
-    @property
-    def subtypedict(self):
-        subtype = self['subtype']
-        return {
-            "type": "TEXT",
-            "is_filter": True,
-            "values": {
-                "is_exact": True,
-                "term": subtype
-            }
-        }
 
     @property
     def is_next(self) -> bool:
@@ -121,8 +119,8 @@ class DataHandler(DBHandler):
     def preprocessor(self, _preprocessor: DataProcessorsAbstract):
         self._preprocessor = _preprocessor
 
-
     def _timestamp_resample_and_drop(self, frame: pd.DataFrame, resample_size="D"):
+        # print(frame)
         timestamps = pd.to_datetime(frame.time, unit='s')
         frame.set_index(timestamps, inplace=True)
         frame = frame.drop(columns=["timestamp", "type", "subcategories", "category", "time"])
@@ -160,9 +158,20 @@ class DataHandler(DBHandler):
         return frame
     
     def closest_head(self):
-        """ Get the closest information at the given head"""
+        """ Get the closest information at the given head. Otherwise get the latest information"""
         head = self.time.head
+        count = self.count()
         closest = self.last_by(head, ar="relative")
+        if len(closest) == 0:
+            if count > 0:
+                last = self.last(ar="relative")
+                last.pop("name", None)
+                last.pop("mtype", None)
+                last.pop("category", None)
+                last.pop("subcategories", None)
+                last.pop("type", None)
+                return last
+            return {}
         closest.pop("name", None)
         closest.pop("category", None)
         closest.pop("subcategories", None)

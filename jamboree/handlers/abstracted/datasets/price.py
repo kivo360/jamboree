@@ -21,7 +21,7 @@ class PriceData(DataHandler):
         self['category'] = "markets"
         self['submetatype'] = "price"
         self.sc = "subcategories" # storing the placeholder key to prevent misspelling
-        self.cat = "category" # storing variable placeholder key to prevent misspelling
+        # self.cat = "category" # storing variable placeholder key to prevent misspelling
 
     @property
     def markets(self) -> List[str]:
@@ -29,6 +29,7 @@ class PriceData(DataHandler):
             'crypto', 'stock', 'commodities', 'forex', 'simulation'
         ]
 
+    
 
     def by_market(self, market_type:str):
         """
@@ -41,7 +42,6 @@ class PriceData(DataHandler):
             return []
 
         _search = self.search
-        _search[self.cat] = "markets"
         _search[self.sc] = {
             "market": market_type
         }
@@ -59,7 +59,6 @@ class PriceData(DataHandler):
             logger.error("The country is not the string.")
             return []
         _search = self.search
-        _search[self.cat] = "markets"
         _search[self.sc] = {
             "country": country,
             # "data"
@@ -77,7 +76,6 @@ class PriceData(DataHandler):
             logger.error("The sector should be a string.")
             return []
         _search = self.search
-        _search[self.cat] = "markets"
         _search[self.sc] = {
             "sector": sector
         }
@@ -94,12 +92,23 @@ class PriceData(DataHandler):
             logger.error("The sector should be a string.")
             return []
         _search = self.search
-        _search[self.cat] = "markets"
         _search["name"] = name
         return _search.find()
     
-    def multi_part_search(self, name=None, country=None, sector=None, market=None, exchange=None):
-        """  """
+
+    def by_exchange(self, name:str):
+        if not isinstance(name, str):
+            logger.error("The sector should be a string.")
+            return []
+        _search = self.search
+        _search[self.sc] = {
+            "exchange": name
+        }
+        return _search.find()
+
+    
+    def multi_search(self, name=None, country=None, sector=None, market=None, exchange=None, is_exact_subcategory=False):
+        """ Search with our conventional parameters for our pricing datasets """
         all_variables = {"name": name, "country": country, "sector": sector, "market": market, "exchange": exchange}
         _name = None
         _subcat_dict = {}
@@ -112,8 +121,11 @@ class PriceData(DataHandler):
             if k == "market":
                 if v not in self.markets:
                     continue
-
-            _subcat_dict[k] = querying.text.exact(v)
+            
+            if is_exact_subcategory:
+                _subcat_dict[k] = querying.text.exact(v)
+            else:
+                _subcat_dict[k] = v
         
         is_size = (len(_subcat_dict) == 0)
         is_name = (_name is None)
@@ -121,16 +133,27 @@ class PriceData(DataHandler):
             return []
 
         _search = self.search
-        # _search.reset()
 
         if not is_name:
-            logger.warning(name)
             _search["name"] = name
-        _search[self.cat] = "markets"
         if not is_size:
             _search[self.sc] = _subcat_dict
         _search.processor = self.processor
         return _search.find()
+    
+
+    def build(self, name:str, abbv:str, country:str="US", sector:str="tech", market:str="stock", exchange:str="binance"):
+        self['name'] = name
+        self['abbreviation'] = abbv
+        self['subcategories'] = {
+            "market": market,
+            "country": country,
+            "sector": sector,
+            "exchange": exchange,
+        }
+        return self
+
+    # def get(self, name=None, country=None, sector=None, )
 
 def main():
     import pandas_datareader.data as web
@@ -141,49 +164,15 @@ def main():
     jam_processor = Jamboree()
     data_hander = PriceData()
     data_hander.processor = jam_processor
-    data_hander.event = jambo
+    trx_tron = data_hander.build("Tron", "TRX", country="Japan", sector="oil", market="commodities", exchange="binance")
     # The episode and live parameters are probably not good for the scenario. Will probably need to switch to something else to identify data
-    data_hander.episode = episode_id
-    data_hander.live = False
-    data_hander['subcategories'] = {
-        "market": "stock",
-        "country": "Mexico",
-        "sector": "tech",
-        "exchange": "binance",
-    }
-    data_hander['name'] = "ETH Ethereum"
-    data_hander.reset()
-    # data_hander.store_time_df(data_msft, is_bar=True)
+    trx_tron.episode = episode_id
+    trx_tron.live = False
+    trx_tron.reset()
+    
 
-
-    data_hander['name'] = "BTC Bitcoin"
-    # data_hander.reset()
-    # data_hander.store_time_df(data_apple, is_bar=True)
-
-    start = maya.now()._epoch
-    # res1 = data_hander.by_name("Bitcoin")
-
-    # logger.debug(res1)
-    end = maya.now()._epoch
-    logger.info(end-start)
-
-    res = data_hander.multi_part_search(market="crypto", exchange="binance")
+    res = trx_tron.multi_search(country="jap")
     pprint.pprint(res)
-    
-    # _search = data_hander.search
-    # _search['subcategories'] = {
-    #     "market": "stock"
-    # }
-    # _search.remove()
-    # data_hander.time.head = maya.now().subtract(weeks=200, hours=14)._epoch
-    # data_hander.time.change_stepsize(microseconds=0, days=1, hours=0)
-    # data_hander.time.change_lookback(microseconds=0, weeks=4, hours=0)
-
-    
-    # while data_hander.is_next:
-    #     logger.debug(data_hander.time.head)
-    #     print(data_hander.closest_head())
-    #     data_hander.time.step()
 
 
 if __name__ == "__main__":

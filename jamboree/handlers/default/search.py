@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import warnings
 from contextlib import suppress
@@ -41,6 +42,8 @@ def dictify(doc):
     item = ADict(**doc.__dict__)
     item.pop("super_id", None)
     item.pop("payload", None)
+    item.pop("id", None)
+
     return item
 
 
@@ -93,7 +96,7 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
                 self.insert_builder.insert_by_type_str(_str_type, key, value)
                 if self.is_sub_key:
                     logger.success(value)
-                    logger.warning(self.query_builder.build())
+                    # logger.warning(self.query_builder.build())
 
 
     @property
@@ -190,10 +193,26 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
                     try:
                         self.current_client.alter_schema_add([i])
                     except ResponseError as res:
-                        # logger.error(str(res))
-                        pass
+                        logger.error(str(res))
                 self.finished_alter = True
         return self.current_client
+
+    @property
+    def general(self):
+        return self.query_builder.general
+
+    @general.setter
+    def general(self, term:str):
+        """ Push a general term into the query. It can only be done once. Don't put it to a filter key."""
+        if not isinstance(term, str):
+            logger.error("Term isn't a string")
+        self.query_builder.general = term
+    
+    
+
+    """
+        This is when things get weird
+    """
 
 
     def create_sub_handlers(self):
@@ -236,8 +255,16 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
         
         results = self.client.search(q)
         result_docs = results.docs
-        # logger.info((built, result_docs))
         return result_docs
+    
+
+    def general_docs(self):
+        built = self.query_builder.build()
+        q = Query(built).paging(0, 1000000)
+        results = self.client.search(q)
+        result_docs = results.docs
+        return result_docs
+
     
     def verbatim_sub_ids(self):
         super_id_set = set()
@@ -253,7 +280,7 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
             if is_falsy:
                 continue
             # logger.error(built)
-            verb_items = sub.verbatim_docs()
+            verb_items = sub.general_docs()
             current_super_ids = []
             current_subs = []
             for verb in verb_items:
@@ -373,14 +400,13 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
             mega_dict.update(key_dict)
         return mega_dict
 
-    # @log_call
+    
     def find(self):
         """Given the items we've set, find all matching items"""
         
         self.set_entity()
         self.keystore.reset()
         if self.use_sub_query: 
-            # logger.info("FUUUUUUUCK")
             return self.sub_find()
         normal = self.normal_find()
         if len(self.subs) == 0:
@@ -393,6 +419,36 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
             ndicts.append(_i)
         return ndicts
     
+    def pick(self, _id:str):
+        """ 
+            Given an id find the element with the top level id. We aren't searching lower level_ids. 
+            
+            After we pull all of the 
+        """
+        self.set_entity()
+        self.keystore.reset()
+        doc = self.client.load_document(_id)
+        dd = doc.__dict__
+        doc = ADict(**dd)
+        _id = doc.pop("id", None)
+        doc.pop("payload", None)
+        doc_z = (len(doc) > 0)
+        if len(self.subs) == 0:
+            if not doc_z:
+                return None
+            doc.update({"id": _id})
+            return doc
+        
+        if doc_z:
+            sub_dicts = self.find_sub_dictionaries(_id)
+            # if len(sub_dicts) > 0:
+            doc.update(sub_dicts)
+            doc.update({"id": _id})
+            return doc
+        
+        return None
+
+
     def update(self):
         """
             # UPDATE
