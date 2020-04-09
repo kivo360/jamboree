@@ -4,6 +4,7 @@ from loguru import logger
 import maya
 from jamboree.handlers.default import DBHandler
 from jamboree import Jamboree
+from jamboree.handlers.abstracted.search import MetadataSearchHandler
 
 class MetaHandler(DBHandler):
     """ 
@@ -52,11 +53,52 @@ class MetaHandler(DBHandler):
     def __init__(self):
         super().__init__()
         self.entity = "metadata"
-        self.required = {}
+        self.required = {
+            "name": str,
+            "category": str,
+            "metatype": str,
+            "submetatype": str,
+            "abbreviation": str,
+            "subcategories": dict
+        }
+        self._search = MetadataSearchHandler()
+    
+    @property
+    def search(self):
+        metatype = self['metatype']
+        submetatype = self['submetatype']
+        self._search.entity = self.entity
+        self._search['metatype'] = {
+            "type": "TEXT",
+            "is_filter": True,
+            "values": {
+                "is_exact": True,
+                "term": metatype
+            }
+        }
+        self._search['submetatype'] = {
+            "type": "TEXT",
+            "is_filter": True,
+            "values": {
+                "is_exact": True,
+                "term": submetatype
+            }
+        }
+        self._search['name'] = self['name']
+        self._search['category'] = self['category']
+        self._search['subcategories'] = self['subcategories']
+        self._search['abbreviation'] = self['abbreviation']
+        self._search.processor = self.processor
+        return self._search
+
+    def access_search(self):
+        """ Knowledge of who touched what """
+        pass
     
     
     def reset(self):
-        logger.info("Reset information here")
+        self.check()
+        self.search.insert(allow_duplicates=False)
     
 
 

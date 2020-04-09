@@ -8,6 +8,8 @@ from jamboree.handlers.base import BaseHandler
 from jamboree.utils.helper import Helpers
 import ujson
 
+from loguru import logger
+
 
 class DBHandler(BaseHandler):
     """ 
@@ -31,9 +33,6 @@ class DBHandler(BaseHandler):
 
     def __setitem__(self, key, value):
         if bool(self.required):
-            # print(key)
-            # print(self.required)
-            # print(value)
             if key in self.required:
                 self._query[key] = value
                 return self._query
@@ -111,7 +110,7 @@ class DBHandler(BaseHandler):
     def query(self):
         return self._query
 
-    @required.setter
+    @query.setter
     def query(self, _query: Dict[str, Any]):
         if len(_query.keys()) > 0:
             self._query = _query

@@ -155,7 +155,9 @@ class MultiDataManagement(DBHandler):
         self.datasethandler.event = self.event
         self.datasethandler.processor = self.processor
         self.datasethandler['category'] = source['category']
+        self.datasethandler['submetatype'] = source['submetatype']
         self.datasethandler['subcategories'] = source['subcategories']
+        self.datasethandler['abbreviation'] = source['abbreviation']
         self.datasethandler['name'] = source['name']
         count = self.datasethandler.count()
         not_zero = (count != 0)
@@ -176,7 +178,18 @@ class MultiDataManagement(DBHandler):
             name = original.get("name", None)
             subcategories = original.get("subcategories", None)
             category = original.get("category", None)
-            if None in [name, category, subcategories]:
+            submetatype = original.get("submetatype", None)
+            abbreviation = original.get("abbreviation", None)
+
+            """
+                dataset['name'] = name
+                dataset['category'] = category
+                dataset['subcategories'] = subcategories
+                dataset['submetatype'] = submetatype
+                dataset['abbreviation'] = abbv
+            """
+
+            if None in [name, category, subcategories, submetatype, abbreviation]:
                 continue
             valid_list.append(original)
         return valid_list
@@ -296,7 +309,7 @@ class MultiDataManagement(DBHandler):
         data_set = {
             
         }
-
+        # We can multi-thread this
         for dataset in self.datasets:
             dataset_name  = str(dataset)
             dataset.event = self.event

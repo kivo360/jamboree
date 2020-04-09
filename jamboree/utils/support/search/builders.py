@@ -29,6 +29,7 @@ class QueryBuilder(object):
         self.geo_query = {
 
         }
+        self._general = ""
         self.all_exact = False
         self.super_id = None
 
@@ -47,7 +48,14 @@ class QueryBuilder(object):
         """ Set all of the Geolocational fields """
         self._geo_fields = set(_geos)
         
+    @property
+    def general(self):
+        return self._general
     
+    @general.setter
+    def general(self, _general):
+        self._general = _general
+
     def exact(self, field, num):
         placeholder = {
             "filter": "number",
@@ -189,6 +197,7 @@ class QueryBuilder(object):
     def _process_text_filter(self) -> str:
         text_lists = [self._single_text(field) for field in self._text_fields]
         joined = " ".join(text_lists)
+        joined = joined.strip()
         return joined
 
 
@@ -229,14 +238,15 @@ class QueryBuilder(object):
             return ""
         join_val = "|"
         _joined = join_val.join(_tags)
-
+        _joined = _joined.strip()
         _tag_filter = f"@{field}: {{ {_joined} }}"
         return _tag_filter
 
     def _process_tag_filter(self) -> str:
         tag_list = [self._single_tag(field) for field in self._tag_fields]
         joined = " ".join(tag_list)
-        return joined
+        trimmed = joined.strip()
+        return trimmed
     
 
     def _single_num(self, field):
@@ -344,13 +354,14 @@ class QueryBuilder(object):
         processed_tags = self._process_tag_filter()
         processed_geo = self._process_geo_filter()
         joined_query_string = " ".join([processed_text, processed_tags, processed_num, processed_bool, processed_geo])
-        return joined_query_string
+        final_joined = self.general + joined_query_string
+        return final_joined
 
     def build_exact(self):
         self.all_exact = True
         processed = self.build()
         self.all_exact = False
-        return processed
+        return processed.strip()
 
 class InsertBuilder(object):
     """

@@ -1,6 +1,5 @@
 import uuid
 from loguru import logger
-from crayons import magenta
 
 import maya
 import pandas as pd
@@ -12,6 +11,9 @@ from jamboree.handlers.default.db import DBHandler
 from jamboree.handlers.complex.meta import MetaHandler
 from jamboree.handlers.default.time import TimeHandler
 from jamboree.handlers.processors import DynamicResample, DataProcessorsAbstract
+from jamboree.handlers.abstracted.search import MetadataSearchHandler
+
+from jamboree.utils.support.search import querying
 
 class DataHandler(DBHandler):
     """ 
@@ -31,19 +33,25 @@ class DataHandler(DBHandler):
 
     def __init__(self):
         super().__init__()
-        self.entity = "data_management"
+        self.entity = "data"
+
         self.required = {
+            "name": str,
             "category": str,
             "subcategories": dict,
-            "name": str,
+            "metatype": str,
+            "submetatype":str,
+            "abbreviation": str
         }
         self._time:TimeHandler = TimeHandler()
         self._meta:MetaHandler = MetaHandler()
+        self._metasearch = MetadataSearchHandler()
         self._episode = uuid.uuid4().hex
         self._is_live = False
         self._preprocessor:DataProcessorsAbstract = DynamicResample("data")
-        self.is_event = False # use to make sure there's absolutely no duplicate data
-    
+        self.is_event = False # use to make sure there's absolutely no duplicate data 
+        self['metatype'] = self.entity
+
     @property
     def episode(self) -> str:
         return self._episode
@@ -74,12 +82,25 @@ class DataHandler(DBHandler):
     
     @property
     def metadata(self):
-        self._meta.event = self.event
+        self._meta.processor = self.processor
+        self._meta['name'] = self['name']
         self._meta['category'] = self['category']
-        self._meta.subcategories = self['subcategories']
-        self._meta.name = self['name']
+        self._meta['subcategories'] = self['subcategories']
+        self._meta['metatype'] = self['metatype']
+        self._meta['submetatype'] = self['submetatype']
+        self._meta['abbreviation'] = self['abbreviation']
         return self._meta
     
+
+    @property
+    def search(self):
+        self._metasearch.reset()
+        self._metasearch['category'] = querying.text.exact(self['category'])
+        self._metasearch['metatype'] = querying.text.exact(self['metatype'])
+        self._metasearch['submetatype'] = querying.text.exact(self['submetatype'])
+        self._metasearch.processor = self.processor
+        return self._metasearch
+
     @property
     def is_next(self) -> bool:
         """ A boolean that determines if there's anything next """
@@ -98,8 +119,8 @@ class DataHandler(DBHandler):
     def preprocessor(self, _preprocessor: DataProcessorsAbstract):
         self._preprocessor = _preprocessor
 
-
     def _timestamp_resample_and_drop(self, frame: pd.DataFrame, resample_size="D"):
+        # print(frame)
         timestamps = pd.to_datetime(frame.time, unit='s')
         frame.set_index(timestamps, inplace=True)
         frame = frame.drop(columns=["timestamp", "type", "subcategories", "category", "time"])
@@ -117,6 +138,14 @@ class DataHandler(DBHandler):
         if is_bar == True:
             storable_list = self.main_helper.standardize_outputs(storable_list)
         self.save_many(storable_list)
+    
+    def add_now(self, data_dict:dict, is_bar=False):
+        """ Add information to the current dataset"""
+        data_dict_list = [data_dict]
+        if is_bar == True:
+            data_dict_list = self.main_helper.standardize_outputs(data_dict_list)
+        self.save_many(data_dict_list)
+
 
     def dataframe_from_head(self):
         """ Get a dataframe between a head and tail. Resample according to our settings"""
@@ -129,9 +158,20 @@ class DataHandler(DBHandler):
         return frame
     
     def closest_head(self):
-        """ Get the closest information at the given head"""
+        """ Get the closest information at the given head. Otherwise get the latest information"""
         head = self.time.head
+        count = self.count()
         closest = self.last_by(head, ar="relative")
+        if len(closest) == 0:
+            if count > 0:
+                last = self.last(ar="relative")
+                last.pop("name", None)
+                last.pop("mtype", None)
+                last.pop("category", None)
+                last.pop("subcategories", None)
+                last.pop("type", None)
+                return last
+            return {}
         closest.pop("name", None)
         closest.pop("category", None)
         closest.pop("subcategories", None)
@@ -194,6 +234,6 @@ if __name__ == "__main__":
 
     
     while data_hander.is_next:
-        logger.info(magenta(data_hander.time.head, bold=True))
+        logger.debug(data_hander.time.head)
         print(data_hander.dataframe_from_head())
         data_hander.time.step()

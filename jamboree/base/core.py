@@ -25,3 +25,4 @@ class Jamboree(Processor):
         self.event.rconn = rconn
         self.event.initialize()
         self.storage.initialize()
+        self.rconn = rconn
