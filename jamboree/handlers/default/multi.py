@@ -18,6 +18,9 @@ import pandas_datareader.data as web
 from jamboree.utils.context import example_space
 from jamboree.handlers.processors import DynamicResample, DataProcessorsAbstract
 
+
+# NOTE: Will probably inherit this to fix it in private.
+
 class MultiDataManagement(DBHandler):
     """ 
         # Multi-Data Handler

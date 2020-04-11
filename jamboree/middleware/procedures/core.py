@@ -45,6 +45,7 @@ class NamedModelMetricSet:
 
 
 class ModelProcedureAbstract(ProcedureAbstract):
+    # _dict = None
     def __init__(self):
         self._mod = None
         self._opt = None
@@ -162,6 +163,10 @@ class ModelProcedureAbstract(ProcedureAbstract):
         metric_set = {}
         # self.named_metric_set
         return metric_set
+    
+    
+
+    
 
 if __name__ == "__main__":
     model_types = ADict()

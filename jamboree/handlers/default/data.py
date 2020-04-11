@@ -50,7 +50,7 @@ class DataHandler(DBHandler):
         self._is_live = False
         self._preprocessor:DataProcessorsAbstract = DynamicResample("data")
         self.is_event = False # use to make sure there's absolutely no duplicate data 
-        self['metatype'] = self.entity
+        # self['metatype'] = self.entity
 
     @property
     def episode(self) -> str:
@@ -86,7 +86,7 @@ class DataHandler(DBHandler):
         self._meta['name'] = self['name']
         self._meta['category'] = self['category']
         self._meta['subcategories'] = self['subcategories']
-        self._meta['metatype'] = self['metatype']
+        self._meta['metatype'] = self.entity
         self._meta['submetatype'] = self['submetatype']
         self._meta['abbreviation'] = self['abbreviation']
         return self._meta
@@ -96,7 +96,7 @@ class DataHandler(DBHandler):
     def search(self):
         self._metasearch.reset()
         self._metasearch['category'] = querying.text.exact(self['category'])
-        self._metasearch['metatype'] = querying.text.exact(self['metatype'])
+        self._metasearch['metatype'] = querying.text.exact(self.entity)
         self._metasearch['submetatype'] = querying.text.exact(self['submetatype'])
         self._metasearch.processor = self.processor
         return self._metasearch

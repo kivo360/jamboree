@@ -174,6 +174,7 @@ class RedisFileConnection(FileStorageConnection):
         return (self.query_exists and self.file_exist)
 
     def absolute_exists(self, query, **kwargs):
+        # self.setup_run = None
         self.setup(query, **kwargs)
         return (self.query_exists and self.file_exist)
 
@@ -213,7 +214,8 @@ class RedisFileConnection(FileStorageConnection):
             self.pipe.srem(set_version, self.version)
     
     def setup(self, query:dict, **kwargs):
-        if self.setup_run is None:
+        is_force = False
+        if self.setup_run is None or is_force:
             self.reset()
             self.settings = Dict(**kwargs)
             self.current_query = query

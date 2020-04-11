@@ -22,7 +22,6 @@ class SampleObject(object):
 def main():
     sample = SampleObject()
     ssample = serialize(sample)
-    # print(ssample)
     dsample = deserialize(ssample)
     assert sample.one == dsample.one
 

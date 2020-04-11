@@ -5,7 +5,7 @@ import pandas as pd
 
 
 from jamboree import JamboreeNew
-from jamboree.handlers.complex.backtest import BacktestDBHandler
+from jamboree.handlers.complex.backtestable import BacktestDBHandler
 from jamboree.handlers.processors import DynamicResample, DataProcessorsAbstract
 from jamboree.utils.core import omit
 
