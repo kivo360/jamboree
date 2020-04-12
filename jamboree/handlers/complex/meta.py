@@ -12,7 +12,7 @@ class MetaHandler(DBHandler):
         --- 
         Metadata is "data that provides information about other data".
         
-        The MetaDatahandler is a way to interact with metadata on each data source we have. 
+        The MetaHandler is a way to interact with metadata on each data source we have. 
         
         
         It should be used with both the DataHandler an MultDataHandler. As well as any other form of common data we're looking for as well. 
@@ -48,6 +48,7 @@ class MetaHandler(DBHandler):
                 - Social interaction location data
                 - Login, logout location data
             - Creating something flexible for this would probably be a good idea. 
+        
 
     """
     def __init__(self):
@@ -62,6 +63,8 @@ class MetaHandler(DBHandler):
             "subcategories": dict
         }
         self._search = MetadataSearchHandler()
+        self._settings = {}
+        self.is_auto = False
     
     @property
     def search(self):
@@ -91,13 +94,41 @@ class MetaHandler(DBHandler):
         self._search.processor = self.processor
         return self._search
 
-    def access_search(self):
-        """ Knowledge of who touched what """
-        pass
+    @property
+    def settings(self):
+        """ Get the latest settings for the item (how to access, how to interact, etc) """
+        if self.is_auto: self.load_settings()
+        return self._settings
+    
+    @settings.setter
+    def settings(self, _settings):
+        self._settings = _settings
+        if self.is_auto: self.save_settings()
+
+    def count_settings(self) -> int:
+        alt = {"detail": "settings"}
+        return self.count(alt=alt)
+
+    def save_settings(self):
+        alt = {"detail": "settings"}
+        self.save(self._settings, alt=alt)
+    
+    def load_settings(self):
+        alt = {"detail": "settings"}
+        self._settings = self.last(self._settings, alt=alt)
+        return self._settings
+
+    def _reset_settings(self):
+        """ If the metadata has a count of zero, add the settings we've inputted """
+        if self.count_settings() == 0:
+            self.save_settings()
+        else:
+            self.load_settings()
     
     
     def reset(self):
         self.check()
+        self._reset_settings()
         self.search.insert(allow_duplicates=False)
     
 

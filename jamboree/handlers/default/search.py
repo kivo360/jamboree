@@ -38,11 +38,12 @@ logger.disable(__name__)
 def split_doc(doc):
     return doc.id, ADict(**doc.__dict__)
 
-def dictify(doc):
+def dictify(doc, is_id=True):
     item = ADict(**doc.__dict__)
     item.pop("super_id", None)
     item.pop("payload", None)
-    item.pop("id", None)
+    if is_id == False:
+        item.pop("id", None)
 
     return item
 
@@ -73,7 +74,7 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
 
 
 
-        
+        self.search_sub = False
         self._processor:Optional[Processor] = None
 
 
@@ -83,9 +84,7 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
         self.is_set_entity = False
         self.current_client = None
         if isinstance(value, dict):
-            # logger.debug(value)
             if len(value) == 0: return
-
             self.handle_input_dict_key(key, value) 
         else:
             _instance_type = type(value)
@@ -94,9 +93,6 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
                 _str_type = to_str(_instance_type)
                 self.query_builder.insert_by_type_str(_str_type, key, value)
                 self.insert_builder.insert_by_type_str(_str_type, key, value)
-                if self.is_sub_key:
-                    logger.success(value)
-                    # logger.warning(self.query_builder.build())
 
 
     @property
@@ -129,7 +125,6 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
     def processor(self, _processor:Processor):
         self._processor = _processor
         self.set_sub_processors()
-        # logger.warning(self._processor)
 
     @property
     def requirements(self):
@@ -274,7 +269,7 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
             sub.print_sub = True
 
             built = sub.query_builder.build()
-            # print(built)
+            # logger.warning(built)
             built = built.strip(' ')
             is_falsy = (not built)
             if is_falsy:
@@ -317,6 +312,7 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
             # If this is a subkey we'll run the same operation again
             # Check to see if the subkey is empty and has information that is reducible to "type"
             self.use_sub_query = True
+            self.search_sub = True
             reqs = self.loaded_dict_to_requirements(item)
             # logger.debug(reqs)
             self.subs[name].requirements = reqs
@@ -359,6 +355,7 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
         results_dicts = []
         for result in results:
             _id, idict = split_doc(result)
+            
             idict.pop("payload", None)
             subitems = self.keystore.get(_id)
             idict.update(subitems)
@@ -378,7 +375,7 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
 
     def sub_insert(self, allow_duplicates=False):
         _super_id, _did_insert = self.normal_insert(allow_duplicates=allow_duplicates)
-
+        logger.info(f'Did insert: {_did_insert}')
         if _did_insert:
             for key, sub in self.subs.items():
                 if len(sub.insert_builder._insert_dict) > 0:
@@ -393,7 +390,7 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
             key_dict = ADict()
             try:
                 res = sub.client.search(f'"{super_id}"')
-                dd = [dictify(doc) for doc in res.docs]
+                dd = [dictify(doc, False) for doc in res.docs]
                 key_dict[key] = dd[0]
             except ResponseError:
                 pass
@@ -406,7 +403,7 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
         
         self.set_entity()
         self.keystore.reset()
-        if self.use_sub_query: 
+        if self.use_sub_query and self.search_sub: 
             return self.sub_find()
         normal = self.normal_find()
         if len(self.subs) == 0:
@@ -414,8 +411,9 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
         ndicts = []
         for i in normal:
             _i = dictify(i)
-            mega = self.find_sub_dictionaries(i.id)
-            _i.update(mega)
+            mega = self.find_sub_dictionaries(_i.id)
+            if len(mega) > 0:
+                _i.update(mega.to_dict())
             ndicts.append(_i)
         return ndicts
     

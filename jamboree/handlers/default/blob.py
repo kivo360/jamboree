@@ -7,12 +7,13 @@
 import copy
 from typing import Any, Dict, Optional
 
-from jamboree import JamboreeNew
-from jamboree.base.processors.abstracts import EventProcessor, Processor
-from jamboree.handlers.base import BaseHandler, BaseFileHandler
-from jamboree.utils.helper import Helpers
 import ujson
 from addict import Dict as ADict
+
+from jamboree import JamboreeNew
+from jamboree.base.processors.abstracts import EventProcessor, Processor
+from jamboree.handlers.base import BaseFileHandler, BaseHandler
+from jamboree.utils.helper import Helpers
 
 class BlobStorageHandler(BaseHandler):
     """ 
@@ -106,7 +107,7 @@ class BlobStorageHandler(BaseHandler):
     def query(self):
         return self._query
 
-    @required.setter
+    @query.setter
     def query(self, _query: Dict[str, Any]):
         if len(_query.keys()) > 0:
             self._query = _query
@@ -135,8 +136,8 @@ class BlobStorageHandler(BaseHandler):
         # Put settings here
         current_settings = ADict()
         current_settings.overwrite = is_overwrite
-        self.changed_since_command = False
         self.processor.storage.save(query, data, **current_settings.to_dict())
+        self.changed_since_command = False
     
 
     def save_version(self, data: dict, version:str, alt={}, is_overwrite=False):
@@ -144,16 +145,18 @@ class BlobStorageHandler(BaseHandler):
         query = self.setup_query(alt)
         # Put settings here
         current_settings = ADict()
-        self.changed_since_command = False
         self.processor.storage.save(query, data, **current_settings.to_dict())
+        
+        self.changed_since_command = False
     
     def absolute_exists(self, alt={}):
         self.check()
         query = self.setup_query(alt)
         # Put settings here
         current_settings = ADict()
-        self.changed_since_command = False
+        current_settings.is_force = self.changed_since_command
         avs = self.processor.storage.absolute_exists(query, **current_settings.to_dict())
+        self.changed_since_command = False
         return avs
 
     def last(self, alt={}):
@@ -169,19 +172,23 @@ class BlobStorageHandler(BaseHandler):
         self.check()
         query = self.setup_query(alt)
         current_settings = ADict()
-        self.changed_since_command = False
         self.processor.storage.query(query, **current_settings.to_dict())
+        self.changed_since_command = False
     
     def delete(self, query:dict, alt={}):
         self.check()
         query = self.setup_query(alt)
         current_settings = ADict()
 
-        self.changed_since_command = False
         self.processor.storage.delete(query, **current_settings)
+        self.changed_since_command = False
     
     def lock(self, alt={}):
         self.check()
         query = self.setup_query(alt)
         self.changed_since_command = False
         return self.processor.event.lock(query)
+    
+    def clear(self):
+        """ Clear in-memory cache. To use with existence checks and rockdb """
+        self.changed_since_command = True

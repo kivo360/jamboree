@@ -122,7 +122,6 @@ class Helpers(object):
                 - Is false if there are errors in the timestamp. Or if time or timestamp is 0
                 - return Boolean
         """
-        # print(item)
         if "time" not in item and "timestamp" not in item:
             return False
         

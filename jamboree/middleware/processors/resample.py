@@ -95,6 +95,3 @@ if __name__ == "__main__":
     mrsample = DynamicResample("modin", days=7)
 
     remicro = mrsample.process(data_msft)
-    print(remicro)
-    # time_str = mrsample.generate_time_string()
-    # print(time_str)

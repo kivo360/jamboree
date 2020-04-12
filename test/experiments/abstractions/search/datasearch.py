@@ -240,12 +240,10 @@ class TestSearchTrial(object):
         # multiple_pick.join()
     
     def run_findselection(self):
-        # logger.warning("something is here")
         self.find_all_datasets_by_exchange()
         item = random.choice(self.dow_metadata)
         item = Dict(**item)
         refind = self.find_meta_by_id((item.id))
-        # print(refind)
         if refind is None:
             raise AttributeError("item doesn't exist")
         datasource = self.from_meta(refind)
