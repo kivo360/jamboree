@@ -25,12 +25,12 @@ from skorch import NeuralNetClassifier
 class TorchProcedure(ModelProcedureAbstract):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__()
-        self.mreqs.model = True
-        self.mreqs.criterion = True
-        self.mreqs.optimizer = True
-        self.mtypes.model = nn.Module
-        self.mtypes.criterion = _Loss
-        self.mtypes.optimizer = Optimizer
+        self.requirements.model = True
+        self.requirements.criterion = True
+        self.requirements.optimizer = True
+        self.types.model = nn.Module
+        self.types.criterion = _Loss
+        self.types.optimizer = Optimizer
         self._compiled_model:Optional[NeuralNet] = None
     
     @property
@@ -38,9 +38,9 @@ class TorchProcedure(ModelProcedureAbstract):
         self.verify()
         if self._compiled_model is None:
             _compiled = NeuralNet(
-                module=self.mdict.model,
-                criterion=self.mdict.criterion,
-                optimizer=self.mdict.optimizer,
+                module=self.dictionary.model,
+                criterion=self.dictionary.criterion,
+                optimizer=self.dictionary.optimizer,
                 max_epochs=10,
                 lr=0.1,
                 # Shuffle training data on each epoch
@@ -51,6 +51,7 @@ class TorchProcedure(ModelProcedureAbstract):
 
     @logger.catch
     def set_params(self, **params):
+        self.changed = True
         self.model.set_params(**params)
 
     @logger.catch
@@ -67,11 +68,12 @@ class TorchProcedure(ModelProcedureAbstract):
 
     @logger.catch
     def partial_fit(self, X, y, **kwargs):
+        self.changed = True
         self.model.partial_fit(X, y, **kwargs)
 
     def fit(self, X, y, **kwargs):
+        self.changed = True
         self.model.fit(X, y, **kwargs)
-        # print(self.mdict.model.predict(X[:2,:], return_std=True))
 
 
 class MyModule(nn.Module):
@@ -95,9 +97,9 @@ class MyModule(nn.Module):
 class TestCustomTorchClassifier(TorchProcedure):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.mdict.model = MyModule
-        self.mdict.optimizer = Adam
-        self.mdict.criterion = nn.NLLLoss
+        self.dictionary.model = MyModule
+        self.dictionary.optimizer = Adam
+        self.dictionary.criterion = nn.NLLLoss
 
 
 

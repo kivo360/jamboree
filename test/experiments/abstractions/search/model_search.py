@@ -19,6 +19,4 @@ class ModelSearchExample(object):
     
 
 def search_models():
-    
-    # 
     pass

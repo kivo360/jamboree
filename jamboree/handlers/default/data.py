@@ -192,11 +192,15 @@ class DataHandler(DBHandler):
     
     
     def __str__(self) -> str:
-        name = self["name"]
-        category = self["category"]
-        subcategories = self["subcategories"]
+        name:str = self["name"]
+        category:str = self["category"]
+        subcategories:dict = self["subcategories"]
+        metatype:str = self['metatype']
+        submetatype:str = self['submetatype']
+        abbreviation:str = self['abbreviation']
+        
         jscat = self.main_helper.generate_hash(subcategories)
-        return f"{name}:{category}:{jscat}"
+        return f"{name}:{category}:{jscat}:{metatype}:{submetatype}:{abbreviation}"
 
     
 if __name__ == "__main__":

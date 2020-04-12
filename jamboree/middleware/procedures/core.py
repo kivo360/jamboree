@@ -1,7 +1,7 @@
 from abc import ABC
-from typing import List
+from typing import List, Dict, Any
 from addict import Dict as ADict
-from addict import Dict
+# from addict import Dict
 
 class ProcedureAbstract(ABC):
     """ 
@@ -10,7 +10,11 @@ class ProcedureAbstract(ABC):
 
     def verify(self):
         """ Ensures we have all of the required variables in place."""
-        raise NotImplementedError
+        raise NotImplementedError("Verify function not implmented")
+
+    def extract(self):
+        """ The item that will be serialized. """
+        raise NotImplementedError("Extract function not implemented")
 
 
 class NamedModelMetric(ABC):
@@ -40,7 +44,40 @@ class NamedModelMetricSet:
     
 
     
+class ProcedureManagement(ABC):
+    """ A way to interact with procedures. Use to embed things like:
+        
+        1. Accessing procedures for a given code base.
+        2. Check for certain attributes within the class
+        3. Declare what's acceptable
+    """
+    def __init__(self):
+        self.required_attributes:List[str] = []
 
+
+    @property
+    def allowed(self) -> List[str]:
+        raise NotImplementedError("You need to set the allowed keys we'll take.")
+
+    
+    def check_allowed(self, key:str):
+        if key not in self.allowed:
+            raise ValueError(f"{key} has to be of the allowed keys ... ")
+
+
+    def access(self, key:str) -> 'ProcedureAbstract':
+        """ Access the procedure we need. Returns a procedure given the key we set it."""
+        raise NotImplementedError("You need to create an access procedure")
+    
+    
+    def isattr(self, parentinstance:Any):
+        """ Checks to see if all of the attributes are in the parent class instance. """
+        if len(self.required_attributes) > 0:
+            for attr in self.required_attributes:
+                if not hasattr(parentinstance, attr):
+                    cls_name = parentinstance.__class__.__name__
+                    msg = f"{cls_name} does not have the attribute {attr}"
+                    raise AttributeError(msg)
 
 
 
@@ -65,36 +102,38 @@ class ModelProcedureAbstract(ProcedureAbstract):
         self._model_requirements.model = True
         self._model_requirements.optimizer = False
         self._model_requirements.criteria = False
-
+        
+        self.changed = False
         self.named_metric_set = NamedModelMetricSet()
-    
 
 
     @property
-    def mdict(self):
+    def dictionary(self):
+        """ A dictionary with all of the model information contained inside. """
         return self._model_dict
     
-    @mdict.setter
-    def mdict(self, _md:ADict):
+    @dictionary.setter
+    def dictionary(self, _md:ADict):
         """ Load in raw model dict information """
         self._model_dict.update(_md)
         # self.verify()
 
     @property
-    def mreqs(self) -> ADict:
+    def requirements(self) -> ADict:
+        """ Return a dictionary of requirements for the ... checking requirements"""
         return self._model_requirements
     
-    @mreqs.setter
-    def mreqs(self, _md:ADict):
+    @requirements.setter
+    def requirements(self, _md:ADict):
         """ Load in raw model dict information """
         self._model_requirements.update(_md)
     
     @property
-    def mtypes(self) -> ADict:
+    def types(self) -> ADict:
         return self._model_typing
 
-    @mtypes.setter
-    def mtypes(self, _mt:ADict):
+    @types.setter
+    def types(self, _mt:ADict):
         self._model_typing.update(_mt)
 
     """
@@ -103,21 +142,21 @@ class ModelProcedureAbstract(ProcedureAbstract):
 
     def verify_model_typing(self):
         """Check that none of the model types are none """
-        for k, v in self.mreqs.items():
+        for k, v in self.requirements.items():
             if not isinstance(v, bool):
                 raise ValueError(f"Model Requirement \'{k}\' must be a boolean value")
             if v == True:
-                if self.mtypes[k] is None:
+                if self.types[k] is None:
                     raise ValueError(f"\'{k}\' Cannot be None in typing delarations")
-                if self.mdict[k] is None:
+                if self.dictionary[k] is None:
                     raise ValueError(f"\'{k}\' Cannot be None inside of the main model dictionary")
     
     def verify_model_dict(self):
         """ Verify that """
-        for name, _type in self.mtypes.items():
+        for name, _type in self.types.items():
             if name is None or _type is None:
                 continue
-            current_item = self.mdict[name]
+            current_item = self.dictionary[name]
             if not isinstance(current_item, _type) and not issubclass(current_item, _type):
                 raise TypeError(f"{name} is not an instance of {_type}")
 
@@ -155,13 +194,12 @@ class ModelProcedureAbstract(ProcedureAbstract):
 
     def extract(self):
         """ Get a dictionary to save the model. Should be called in close """
-        return self.mdict
+        return self.dictionary
 
     @property
     def metrics(self):
         """ Given the information we have, return a set of metrics"""
-        metric_set = {}
-        # self.named_metric_set
+        metric_set = self.named_metric_set.metrics(0, 0)
         return metric_set
     
     

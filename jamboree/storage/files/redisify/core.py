@@ -163,7 +163,7 @@ class RedisFileConnection(FileStorageConnection):
         """ Update the file version and update the file. """
         self.update_version()
         self.update_file(file)
-        logger.error(self.version_key)
+        logger.error(file)
 
     @property
     def garbage_patch(self):
@@ -194,8 +194,8 @@ class RedisFileConnection(FileStorageConnection):
         
         if self.garbage_patch:
             # If the query and file exist
-            logger.debug("File exist, we're gonna try pulling it")
-            logger.debug(self.version)
+            # logger.debug("File exist, we're gonna try pulling it")
+            # logger.debug(self.version)
             item = self.pipe.get(self.version_key)
             unpacked = deserialize(item)
             if unpacked is None:
@@ -214,7 +214,7 @@ class RedisFileConnection(FileStorageConnection):
             self.pipe.srem(set_version, self.version)
     
     def setup(self, query:dict, **kwargs):
-        is_force = False
+        is_force = kwargs.pop("is_force", False)
         if self.setup_run is None or is_force:
             self.reset()
             self.settings = Dict(**kwargs)

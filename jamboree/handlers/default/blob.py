@@ -7,12 +7,13 @@
 import copy
 from typing import Any, Dict, Optional
 
-from jamboree import JamboreeNew
-from jamboree.base.processors.abstracts import EventProcessor, Processor
-from jamboree.handlers.base import BaseHandler, BaseFileHandler
-from jamboree.utils.helper import Helpers
 import ujson
 from addict import Dict as ADict
+
+from jamboree import JamboreeNew
+from jamboree.base.processors.abstracts import EventProcessor, Processor
+from jamboree.handlers.base import BaseFileHandler, BaseHandler
+from jamboree.utils.helper import Helpers
 
 class BlobStorageHandler(BaseHandler):
     """ 
@@ -145,6 +146,7 @@ class BlobStorageHandler(BaseHandler):
         # Put settings here
         current_settings = ADict()
         self.processor.storage.save(query, data, **current_settings.to_dict())
+        
         self.changed_since_command = False
     
     def absolute_exists(self, alt={}):
@@ -153,7 +155,6 @@ class BlobStorageHandler(BaseHandler):
         # Put settings here
         current_settings = ADict()
         current_settings.is_force = self.changed_since_command
-        # print(current_settings)
         avs = self.processor.storage.absolute_exists(query, **current_settings.to_dict())
         self.changed_since_command = False
         return avs
@@ -189,7 +190,5 @@ class BlobStorageHandler(BaseHandler):
         return self.processor.event.lock(query)
     
     def clear(self):
-        """ Clear in-memory cache """
+        """ Clear in-memory cache. To use with existence checks and rockdb """
         self.changed_since_command = True
-        # print(self.changed_since_command)
-        pass

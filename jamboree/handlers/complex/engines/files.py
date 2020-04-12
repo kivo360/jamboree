@@ -1,37 +1,27 @@
 import random
 import time
 import uuid
-from typing import Optional, List
+from pprint import pprint
+from typing import Any, List, Optional
 
 import maya
 from addict import Dict
 from loguru import logger
 
 from jamboree import Jamboree
+from jamboree.handlers.abstracted.search.meta import MetadataSearchHandler
 from jamboree.handlers.complex.backtestable import BacktestBlobHandler
+from jamboree.handlers.complex.meta import MetaHandler
 from jamboree.handlers.complex.metric import MetricHandler
 from jamboree.middleware.procedures import (
-    CremeProcedure,
+    ProcedureAbstract,
+    ProcedureManagement,
     ModelProcedureAbstract,
-    SklearnProcedure,
-    TFKerasProcedure,
-    TorchProcedure,
+    ModelProcedureManagement,
 )
-from jamboree.handlers.abstracted.search.meta import MetadataSearchHandler
-from jamboree.handlers.complex.meta import MetaHandler
 from jamboree.utils.support.search import querying
-from pprint import pprint
 
-
-class LogInformation:
-    def is_exist(self, existence):
-        if existence:
-            logger.success("File exist")
-        else:
-            logger.error("File doesn't exist")
-
-    def open_context(self):
-        logger.warning("Opening context")
+logger.disable(__name__)
 
 
 class FileEngine(BacktestBlobHandler):
@@ -96,9 +86,6 @@ class FileEngine(BacktestBlobHandler):
         if processor is not None:
             self.processor = processor
 
-        self.model_type = ""
-        self.searchable_items = ["name", "subcategories", "abbreviation"]
-
         self.initialize(**kwargs)
 
     """ 
@@ -109,13 +96,24 @@ class FileEngine(BacktestBlobHandler):
     """
 
     def __enter__(self):
-        # self.reset_model()
         self.open_context()
-        return self.model
+        return self.enterable()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         # make sure the dbconnection gets closed
         self.close_context()
+
+    def enterable(self):
+        """ Return the object we want to enter into """
+        raise NotImplementedError("Enterable not added yet.")
+
+    def open_context(self):
+        """ Take the model from the model procedure and save it. """
+        raise NotImplementedError("Open context hasn't had anything added")
+
+    def close_context(self):
+        """ Take the model from the model procedure and save it. """
+        raise NotImplementedError("Close context hasn't had anything added.")
 
     """
         Initialize everything for the user
@@ -137,45 +135,25 @@ class FileEngine(BacktestBlobHandler):
         self.online = kwargs.get("online", False)
         self.bfile = kwargs.get("blobfile", None)
         self.file_reset = False
+        self.searchable_items = kwargs.get(
+            "searchable", ["name", "subcategories", "abbreviation"]
+        )
+        self.pm: Optional[ProcedureManagement] = kwargs.get("proc_management", None)
 
     def init_required(self, **kwargs):
         if len(kwargs) == 0:
             return
-        for k in self.required.keys():
+        for k, v in self.required.items():
             if k in kwargs:
-                self[k] = kwargs.get(k)
+                value = kwargs.get(k)
+                if isinstance(value, v):
+                    self[k] = value
 
     def init_specialized(self, **kwargs):
         """ Initialize all of the highly specific parts """
-        logger.error("Loading specialized variables")
+        self.current_procedure = None
 
-    """
-        # Context Commands
-
-        * Open Context - Load data and do preprocessing on it
-        * Close Context - Save data, send commands, run through other customized tidbits of information
-    """
-
-    def open_context(self):
-        """ Take the model from the model procedure and save it. """
-        self.model.extract()
-
-    def close_context(self):
-        """ Take the model from the model procedure and save it. """
-        metric_schema = {"accuracy": random.uniform(0, 1), "f1": random.uniform(0, 1)}
-        logger.warning(metric_schema)
-        # logger.debug(type(metric_schema))
-        # self.metrics.log(metric_schema)
-
-    """
-        # Properties
-
-        Properties that will run common for all other files/blobs.
-
-        1. Other Handlers - For things like metrics, search and metadata
-        2. Key variables - 
-        3. File variables - Variables to manage the files
-    """
+    """ Properties """
 
     """ 
         # Handler Properties 
@@ -209,7 +187,7 @@ class FileEngine(BacktestBlobHandler):
         self._meta["category"] = self["category"]
         self._meta["subcategories"] = self["subcategories"]
         self._meta["metatype"] = self.entity
-        self._meta["submetatype"] = self.model_type
+        self._meta["submetatype"] = self['submetatype']
         self._meta["abbreviation"] = self["abbreviation"]
         return self._meta
 
@@ -230,13 +208,14 @@ class FileEngine(BacktestBlobHandler):
 
         1. Checking to see if a file is in storage
         2. Checking to see if we've modified a variable since interacting with storage
+        3. Setting verification methods and procedure management
     """
+
     @property
     def is_exist(self) -> bool:
         """ Checks to see if a model exist in storage."""
         existence = self.absolute_exists()
         return existence
-    
 
     @property
     def is_exist_forced(self) -> bool:
@@ -245,67 +224,32 @@ class FileEngine(BacktestBlobHandler):
         existence = self.absolute_exists()
         return existence
 
-
-
     @property
     def changed(self) -> bool:
         return self.changed_since_command
-
     @property
-    def available(self):
-        return ["sklearn", "torch", "keras", "creme"]
-
-    @property
-    def procedure(self) -> Optional[ModelProcedureAbstract]:
-        if self.custom_procedure is None:
-            _customized = {
-                "sklearn": SklearnProcedure(),
-                "torch": TorchProcedure(),
-                "keras": TFKerasProcedure(),
-                "creme": CremeProcedure(),
-            }.get(self.model_type)
-            return _customized
-            # customized
-        return self.custom_procedure
+    def procedure(self) -> Optional["ProcedureAbstract"]:
+        raise NotImplementedError("Procedure has not been implemented")
 
     @procedure.setter
-    def procedure(self, _procedure: "ModelProcedureAbstract"):
-        self.custom_procedure = _procedure
-        self.current_model = self.custom_procedure.extract()
-
+    def procedure(self, _procedure: "ProcedureAbstract"):
+        """ Set the access procedure"""
+        self.current_procedure = _procedure
 
     @property
     def is_procedure(self):
-        return self.custom_procedure is not None
+        return self.current_procedure is not None
+
+    @property
+    def is_proc(self) -> bool:
+        """ Checks to see if procedure has been set"""
+        return not self.current_procedure
 
     @property
     def is_local_file(self) -> bool:
         """ Boolean explaining if we've set a file locally. Files can be set either through pulling from the DB or manually"""
         # if the blob file has been set locally, set the response to true
         return self.blobfile is not None
-
-    @property
-    def is_loaded(self) -> bool:
-        """ Determines if we've loaded a model """
-        return self.current_model is not None
-
-    @property
-    def model(self):
-        """ 
-            Returns a model procedure. 
-            A procedure should be loaded on __enter__ 
-        """
-        return self.procedure
-
-    def verify(self):
-        """ Verifies the information that that's inside of the constructor"""
-        if not isinstance(self.model_type, str) or (
-            self.model_type not in self.available
-        ):
-            raise ValueError("Model type is not valid type")
-        if not isinstance(self.online, bool):
-            raise ValueError("Not able to determine if this model is online")
-
     @property
     def blobfile(self):
         return self.bfile
@@ -317,54 +261,41 @@ class FileEngine(BacktestBlobHandler):
     """
         # Database Commands
 
-        * Save model
-        * Load model
+        * Save file
+        * Load file
     """
 
-    def load_model(self):
-        self.current_model = self.last()
-        return self.current_model
+    def verify(self):
+        self.pm.isattr(self)
 
-    def save_model(self, alt={}):
-        self.save(self.current_model, alt=alt, is_overwrite=self.online)
 
-    def print_latest_result(self):
-        proving_its_there = self.metadata.search.find()
-        logger.info(proving_its_there)
+    def load_file(self):
+        loaded_file = self.last()
+        return loaded_file
 
-        # No idea what else should be here
+    def save_file(self, _file: Any, alt={}):
+        self.save(_file, alt=alt, is_overwrite=self.online)
 
-    
 
     """
-        Reset Commands
-    """
+        # SEARCH
 
-    # def reset_model(self):
-    #     """ Reset the model to be used """
+        Search related functions from metadata.
 
-    #     self.verify()
-
-    #     # NOTE: Time to split this logic to prevent errors
-    #     if self.model_reset or self.has_changed:
-    #         return
-
-    #     if self.is_exist:
-    #         self.reset_exist()
-    #     else:
-    #         self.reset_noexist()
-
-    #     self.model_reset = True
-
-    
-
-    """
-        # Search
-
-        All search related functions.
+        * load_search 
+            * Get a MetadataSearchHandler that automatically adds the searchable items into the data.
+        
+        * search_all
+            * A generalized search for all of our datasets given a general term and 
     """
 
     def loaded_search(self, **kwargs) -> MetadataSearchHandler:
+        """ 
+            # LOAD SEARCH
+
+            * Get a meatadatasearchandler that automatically adds the searchable fields into the search field.
+            * Ensure to change self.searchable_items to change what we're allowed to search through
+        """
         self.clear()
         current_search = self.search
         for field in self.searchable_items:
@@ -374,7 +305,28 @@ class FileEngine(BacktestBlobHandler):
                     current_search[field] = current_value
         return current_search
 
-    def first(self, **kwargs):
+    def search_all(self, general: str, **kwargs):
+        """ 
+            # SEARCH ALL
+
+            * Search through all of the records. 
+            * To be used to find through files from the UI.
+        """
+        current_search = self.loaded_search(**kwargs)
+        current_search.general = general
+        return current_search.find()
+
+    def file_from_dict(self, item: Dict):
+        reloaded = FileEngine(
+            processor=self.processor,
+            name=item.name,
+            category=item.category,
+            subcategories=item.subcategories,
+            submetatype=item.submetatype,
+            abbreviation=item.abbreviation,
+        )
+        return reloaded
+    def first(self, **kwargs) -> "FileEngine":
         """ Find a model by metadata. If there are models, get the one that exist. Otherwise return None"""
         current_search = self.loaded_search(**kwargs)
 
@@ -383,24 +335,11 @@ class FileEngine(BacktestBlobHandler):
             raise AttributeError("No model metadata found with those exact parameters")
 
         first = items[0]
-        logger.error(first)
-        model_type = first.get("submetatype")
-        reloaded = FileEngine()
-        reloaded.model_type = model_type
-        reloaded["name"] = first.get("name")
-        reloaded["category"] = first.get("category")
-        reloaded["subcategories"] = first.get("subcategories")
-        reloaded["submetatype"] = model_type
-        reloaded["abbreviation"] = first.get("abbreviation")
-        reloaded.processor = self.processor
-        reloaded.changed_since_command = True
+        first = Dict(**first)
+
+        reloaded = self.file_from_dict(first)
         reloaded.reset()
         return reloaded
-
-    def search_all(self, general: str, **kwargs):
-        current_search = self.loaded_search(**kwargs)
-        current_search.general = general
-        return current_search.find()
 
     def pick(self, _id: str):
         """ Get a specific item from the system by first using the id generated"""
@@ -410,227 +349,62 @@ class FileEngine(BacktestBlobHandler):
         if item is None:
             raise AttributeError("File Metadata doesn't exist")
 
-        # Create a load function you can pull the data from the dictionary from
-        model_type = item.get("submetatype")
-        reloaded = FileEngine()
-        reloaded.model_type = model_type
-        reloaded["name"] = item.get("name")
-        reloaded["category"] = item.get("category")
-        reloaded["subcategories"] = item.get("subcategories")
-        reloaded["submetatype"] = model_type
-        reloaded["abbreviation"] = item.get("abbreviation")
-        reloaded.processor = self.processor
+        item = Dict(**item)
+        reloaded = self.file_from_dict(item)
         reloaded.reset()
-        logger.info(reloaded)
         return reloaded
-
-
 
     """ Reset Commands """
 
-    def reset_exist(self):
-        """
-            Splitting the logic for things that do exist
-        """
-        model = self.load_model()
-        proc = self.procedure
-        # proc
-        proc.mdict = model
-        proc.verify()
-        self.procedure = proc
+    def custom_post_load(self, item):
+        """ Customize what happens after we load it """
+        raise NotImplementedError("You need to figure out how to manage a loaded file")
 
+    def reset_exist(self, **kwargs):
+        """ Reset logic for if a file already exists """
+        item = self.load_file()
+        self.custom_post_load(item)
+        return item
 
     def reset_noexist(self):
         """
-            Splitting the logic for things that don't exist
+            Save a file if it doesn't exist yet. Add procedure filter. Load function won't check for this.
         """
         if self.is_local_file:
-            logger.success("Detecting file locally!!!")
-            logger.info("Preprocessing the file and doing the appropiate checks")
-            logger.success("Saving the file")
+            # logger.success("Starting to save file")
+            if isinstance(self.blobfile, ProcedureAbstract):
+                extracted = self.blobfile.extract()
+                self.save_file(extracted)
+                return
+            self.save_file(self.blobfile)
+            # logger.success("File officially saved")
         else:
             raise AttributeError(
                 "You either need to have a procedure loaded or a pre-existing model"
             )
 
-
     def reset_file(self):
-        # Run through the custom verification scheme here
+        """
+            # RESET FILE
+
+            Get the files. 
+        """
         self.verify()
-        if self.is_exist:
-            logger.success("File exist")
+
+        if self.file_reset and not self.changed_since_command:
+            return
+
+        if self.is_exist_forced:
+            self.reset_exist()
         else:
             self.reset_noexist()
         self.file_reset = True
-
+        self.changed_since_command = False
 
     def reset(self):
         super().reset()
         self.reset_file()
         if self.is_exist_forced:
             self.metadata.reset()
-        # self.model_reset = False
-        # self.reset_model()
-        # # self.metrics.reset()
-
-
-class ModelEngine(FileEngine):
-    """ """
-
-    def __init__(self, processor, **kwargs):
-        super().__init__(processor=processor, **kwargs)
-
-    # def reset_exist(self):
-    #     """
-    #         Splitting the logic for things that do exist
-    #     """
-    #     model = self.load_model()
-    #     proc = self.procedure
-    #     # proc
-    #     proc.mdict = model
-    #     proc.verify()
-    #     self.procedure = proc
-
-
-    # def reset_noexist(self):
-    #     """
-    #         Splitting the logic for things that don't exist
-    #     """
-    #     if self.is_local_file:
-    #         # proc = self.procedure
-    #         # proc.verify()
-    #         # self.current_model = proc.extract()
-    #         # self.save_model()
-    #         # self.metadata.search.reset()
-    #     else:
-    #         raise AttributeError(
-    #             "You either need to have a procedure loaded or a pre-existing model"
-    #         )
-
-    # def reset_exist(self):
-    #     """
-    #         Splitting the logic for things that do exist
-    #     """
-    #     model = self.load_model()
-    #     proc = self.procedure
-    #     # proc
-    #     proc.mdict = model
-    #     proc.verify()
-    #     self.procedure = proc
-
-    # def init_specialized(self, **kwargs):
-    #     """ Initialize all of the highly specific parts """
-    #     self.net = None
-    #     self.criterion = None
-    #     self.optimizer = None
-
-    #     self.current_model = None
-    #     self.custom_procedure: Optional[ModelProcedureAbstract] = None
-    #     self.model_reset = False
-
-
-class GenericClass(object):
-    def __init__(self):
-        self.x = 0
-        self.y = 0
-
-
-
-def main():
-
-    """
-        # Model Engine Use Case
-        
-
-        ### Custom Torch Handler Should Have A Model Inside Already
-        compute_engine = CustomTorchHandler()
-        compute_engine.processor = jam
-        compute_engine['name'] = "MNIST
-        compute_engine['category'] = "image"
-        compute_engine['subcategories'] = {}
-        compute_engine.reset()
-
-        with compute_engine as model:
-            prediction = model.fit_predict(data)
-
-        Use prediction here
-    """
-
-    from jamboree.middleware.procedures.models.learn import (
-        CustomSklearnGaussianProcedure,
-    )
-
-    file_name = uuid.uuid4().hex
-    logger.debug("Starting model experiment")
-    jamboree_processor = Jamboree()
-    compute_engine = FileEngine()
-    compute_engine.model_type = "sklearn"
-    compute_engine.processor = jamboree_processor
-    compute_engine.online = True
-    compute_engine.procedure = CustomSklearnGaussianProcedure()
-    compute_engine["name"] = file_name
-    compute_engine["submetatype"] = "sklearn"
-    compute_engine["abbreviation"] = "GAUSSLEARN"
-
-    compute_engine["category"] = "imaging"
-    compute_engine["subcategories"] = {"ml_type": "gaussian"}
-    compute_engine.time.change_stepsize(microseconds=0, seconds=0, hours=4)
-
-    compute_engine.reset()
-
-    with compute_engine as model:
-        logger.info(model.extract())
-
-    for _ in range(100):
-        with compute_engine as model:
-            logger.info(model)
-        compute_engine.time.step()
-
-    reloaded = compute_engine.first(name=file_name)
-
-    all_models = compute_engine.search_all("image")
-    compute_engine.pick("33a3eb94a41c4d9ebc453b90b1986c0f")
-    logger.success(all_models)
-    with reloaded as model:
-        logger.debug(f"The Procedure we're using is ... {dir(model)}")
-    
-
-
-def file_engine_main():
-    """ 
-        Creating a generic usage of the file engine instead of only model storage. 
-
-        To test, we're going to entirely duplicate the prior test. 
-        Only we're going to use generic functions and variables. In essensce, rebuild the `ModelEngine` starting with the file handler
-
-        Key steps:
-
-        1. Create a subclass of the file engine for the model engine
-        2. Set a file
-        3. 
-    """
-
-    from jamboree.middleware.procedures.models.learn import (
-        CustomSklearnGaussianProcedure,
-    )
-
-    file_name = uuid.uuid4().hex
-    logger.info("Starting file engine experiment")
-    logger.info(f"The file name is: {file_name}")
-    jamboree_processor = Jamboree()
-    with logger.catch(message="This should fail immediately"):
-        # Initialize a file engine
-        model_engine = ModelEngine(
-            processor=jamboree_processor,
-            name=file_name,
-            category="machine",
-            subcategories={"ml_type": "gaussian"},
-            abbreviation="GAUSS",
-            submetatype="sklearn",
-            blobfile=CustomSklearnGaussianProcedure(),
-        )
-        model_engine.reset()
-
-
-if __name__ == "__main__":
-    file_engine_main()
+        self.model_reset = False
+        self.metrics.reset()
