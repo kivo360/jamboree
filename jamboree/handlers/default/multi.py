@@ -1,22 +1,23 @@
-import uuid
-import time
-import maya
-from copy import deepcopy
-import ujson
 import json
-import crayons as cy
-import uuid
 import pprint
-from typing import List, Dict, Any
-from jamboree.handlers.default import DBHandler
-from jamboree.handlers.default import DataHandler
-from jamboree.handlers.default import TimeHandler
-from jamboree import JamboreeNew
-from loguru import logger
-import pandas_datareader.data as web
+import time
+import uuid
+from copy import deepcopy
+from typing import Any, Dict, List
 
+import crayons as cy
+import maya
+import pandas_datareader.data as web
+import ujson
+from loguru import logger
+
+from jamboree import JamboreeNew
+from jamboree.handlers.default import DataHandler, DBHandler, TimeHandler
+from jamboree.middleware.processors import DataProcessorsAbstract, DynamicResample
 from jamboree.utils.context import example_space
-from jamboree.handlers.processors import DynamicResample, DataProcessorsAbstract
+from jamboree.utils.core import consistent_hash, consistent_unhash
+# NOTE: Will probably inherit this to fix it in private.
+
 
 class MultiDataManagement(DBHandler):
     """ 
@@ -39,11 +40,12 @@ class MultiDataManagement(DBHandler):
         - Getting a superset of different asset classes to predict movements between them.
         - Getting a predefied pair to determine which signals should be used.
     """
-    def __init__(self):
+
+    def __init__(self, **kwargs):
         super().__init__()
-        
+
         self.entity = "multi_data_management"
-        
+
         """ 
             # Required variables
             ---
@@ -51,32 +53,62 @@ class MultiDataManagement(DBHandler):
             - Set name This is the name of the data sets we're going to have
         """
         self.required = {
-            "set_name": str
+            "name": str,
+            "category": str,
+            "subcategories": dict,
+            "metatype": str,
+            "submetatype":str,
+            "abbreviation": str
         }
-        self._episode = uuid.uuid4().hex
-        self._is_live = False
-        self.is_event = False # use to make sure there's absolutely no duplicate data. We only use it when there's a change in the data sources
-        self.datasethandler:DataHandler = DataHandler()
-        self._time:TimeHandler = TimeHandler()
-        self._preprocessor:DataProcessorsAbstract = DynamicResample("data")
-        self.is_real_filter:bool = True
-        self.data_handler_list:List[DataHandler] = [] # Store the dataset objects we can access at once without redeclaring
-        self.dup_check_list = [] # use to check for duplicates in dataset
-    
+
+        self.initialize(**kwargs)
+        self.data_handler_list: List[
+            DataHandler
+        ] = []  # Store the dataset objects we can access at once without redeclaring
+        self.dup_check_list = []  # use to check for duplicates in dataset
+
+    def initialize(self, **kwargs):
+        """ A more concentrated place to initialize everything"""
+        self.init_handlers()
+        self.init_default(**kwargs)
+        self.init_required(**kwargs)
+
+    def init_default(self, **kwargs):
+        self._episode: str = kwargs.get("episode", uuid.uuid4().hex)
+        self._is_live: bool = kwargs.get("live", False)
+        self._preprocessor = kwargs.get("preprocessor", DynamicResample("data"))
+
+        self.is_real_filter: bool = kwargs.get("real_filter", True)
+        self['metatype'] = self.entity
+        self.is_event = False
+
+    def init_required(self, **kwargs):
+        if len(kwargs) == 0:
+            return
+        for k, v in self.required.items():
+            if k in kwargs:
+                value = kwargs.get(k)
+                if isinstance(value, v):
+                    self[k] = value
+
+    def init_handlers(self):
+        self.datasethandler: DataHandler = DataHandler()
+        self._time: TimeHandler = TimeHandler()
+
     @property
     def episode(self) -> str:
         return self._episode
-    
+
     @episode.setter
-    def episode(self, _episode:str):
+    def episode(self, _episode: str):
         self._episode = _episode
-    
+
     @property
     def live(self) -> bool:
         return self._is_live
-    
+
     @live.setter
-    def live(self, _live:bool):
+    def live(self, _live: bool):
         self._is_live = _live
 
     @property
@@ -84,42 +116,55 @@ class MultiDataManagement(DBHandler):
         source_dict = self.latest_dataset_list()
         source_list = source_dict.get("sources", [])
         return source_list
-    
+
     @property
     def datasets(self) -> List[DataHandler]:
         return self.data_handler_list
-    
+
     @property
-    def time(self) -> 'TimeHandler':
+    def time(self) -> "TimeHandler":
         self._time.event = self.event
         self._time.processor = self.processor
-        self._time['episode'] = self.episode
-        self._time['live'] = self.live
+        self._time["episode"] = self.episode
+        self._time["live"] = self.live
         return self._time
-    
+
     @property
     def preprocessor(self) -> DataProcessorsAbstract:
         return self._preprocessor
-    
+
     @preprocessor.setter
     def preprocessor(self, _preprocessor: DataProcessorsAbstract):
         self._preprocessor = _preprocessor
-    
+
     @property
     def is_next(self) -> bool:
         """ Determine if anything is next in the head"""
         processor = self.processor
-        is_live_list:List[bool] = []
+        is_live_list: List[bool] = []
         for ds in self.datasets:
             ds.processor = processor
             ds.episode = self.episode
             ds.live = self.live
             is_live_list.append(ds.is_next)
-        
+
         # Use all to determine if the values are falsey or not
         return all(is_live_list)
+    
+    def allvalid(self, item:dict):
+        
+        name =          item.get("name", None)
+        category =      item.get("category", None)
+        subcategories = item.get("subcategories", None)
+        submetatype =   item.get("submetatype", None)
+        abbreviation =  item.get("abbreviation", None)
+        if None in [name, category, subcategories, submetatype, abbreviation]:
+            return False
+        return True
 
-    def add_multiple_data_sources(self, sources: List[Dict[str, Any]], alt={}, allow_bypass=False):
+    def add_multiple_data_sources(
+        self, sources: List[Dict[str, Any]], alt={}, allow_bypass=False
+    ):
         """ Add a dataset list"""
         if allow_bypass == True:
             self.save_dataset_list(sources)
@@ -128,8 +173,23 @@ class MultiDataManagement(DBHandler):
         if is_valid:
             self.save_dataset_list(sources)
 
+    def remove_multiple_datasources(
+        self, rsources: List[Dict[str]], alt={}, allow_bypass=False
+    ):
 
-    def add_data_source(self, source:Dict[str, Any]):
+        existing = self.sources
+        if len(existing) == 0 or len(rsources) == 0: return
+        
+        rhashes = set(consistent_hash(i) for i in rsources)
+        ohashes = set(consistent_hash(i) for i in existing)
+        
+
+        remaining_hash = ohashes - rhashes
+        remaining = [consistent_unhash(x) for x in remaining_hash]
+        sources_dict = {"sources": remaining}
+        self.save(sources_dict)
+
+    def add_data_source(self, source: Dict[str, Any]):
         if not isinstance(source, dict):
             logger.error("Not a dictionary. Skipping ... ")
             return
@@ -137,8 +197,11 @@ class MultiDataManagement(DBHandler):
         self.add_multiple_data_sources(source_list)
 
     def remove_data_source(self, source: Dict[str, Any]):
-        pass
-
+        if not isinstance(source, dict):
+            logger.error("Not a dictionary. Skipping ... ")
+            return
+        source_list = [source]
+        self.remove_multiple_datasources(source_list)
 
     def add_dataset_handler(self):
         _copy = self.datasethandler.copy()
@@ -150,37 +213,36 @@ class MultiDataManagement(DBHandler):
         self.datasethandler.processor = self.processor
         self.data_handler_list.append(_copy)
 
-    def _is_data_exist(self, source:dict) -> bool:
+    def _is_data_exist(self, source: dict) -> bool:
         """ Check to see if the data exist when putting list of datahandlers together"""
         self.datasethandler.event = self.event
         self.datasethandler.processor = self.processor
-        self.datasethandler['category'] = source['category']
-        self.datasethandler['subcategories'] = source['subcategories']
-        self.datasethandler['name'] = source['name']
+        self.datasethandler["name"] = source["name"]
+        self.datasethandler["category"] = source["category"]
+        self.datasethandler["subcategories"] = source["subcategories"]
+        self.datasethandler["submetatype"] = source["submetatype"]
+        self.datasethandler["abbreviation"] = source["abbreviation"]
         count = self.datasethandler.count()
-        not_zero = (count != 0)
+        not_zero = count != 0
         if not_zero:
             self.add_dataset_handler()
         return not_zero
 
-    def _add_wo_duplicates(self, original_list:list, new_list:list):
+    def _add_wo_duplicates(self, original_list: list, new_list: list):
         original_set = set(ujson.dumps(i, sort_keys=True) for i in original_list)
         for item in new_list:
             frozen = ujson.dumps(item, sort_keys=True)
             original_set.add(frozen)
         return [ujson.loads(x) for x in original_set]
-    
+
     def _remove_invalid_dataset_formats(self, original_list: List[Dict[str, Any]]):
         valid_list = []
         for original in original_list:
-            name = original.get("name", None)
-            subcategories = original.get("subcategories", None)
-            category = original.get("category", None)
-            if None in [name, category, subcategories]:
+            if self.allvalid(original):
                 continue
             valid_list.append(original)
         return valid_list
-    
+
     def _filter_non_existing_datasets(self, _datasets):
         all_sets = []
         for source in _datasets:
@@ -189,12 +251,10 @@ class MultiDataManagement(DBHandler):
                 all_sets.append(source)
         return all_sets
 
-
-    def _validate_added_sources(self, sources:List[Dict[str, Any]]):
+    def _validate_added_sources(self, sources: List[Dict[str, Any]]):
         if not isinstance(sources, list):
             logger.error("Sources is not a list. Skipping ...")
             return False
-
 
         if len(sources) == 0:
             logger.error("Sources is empty. Skipping ...")
@@ -202,31 +262,30 @@ class MultiDataManagement(DBHandler):
 
         for source in sources:
             if not isinstance(source, dict):
-                logger.error("An item inside of the sources list is not a dictionary. Skipping ...")
+                logger.error(
+                    "An item inside of the sources list is not a dictionary. Skipping ..."
+                )
                 return False
-            
+
             keys = source.keys()
             if len(keys) == 0:
                 logger.error("One of the dictionaries doesn't have a key. Skipping ...")
                 return False
-            
+
             for key in keys:
                 if not isinstance(key, str):
-                    logger.error("Dude, stop messing up. One of the keys isn't a string. Skipping ...")
+                    logger.error(
+                        "Dude, stop messing up. One of the keys isn't a string. Skipping ..."
+                    )
                     return False
         return True
-
-
-
 
     # -------------------------------------------------------------------------------------------
     # -------------------------------------------------------------------------------------------
     # --------------------------------- I/O Commands --------------------------------------------
     # -------------------------------------------------------------------------------------------
     # -------------------------------------------------------------------------------------------
-
-
-    def save_dataset_list(self, sources:List[Dict[str, Any]]):
+    def save_dataset_list(self, sources: List[Dict[str, Any]]):
         self.check()
         # We store the sources list into a dictionary to make it easier for Jamboree to handle
         latest_sources = self.latest_dataset_list()
@@ -237,27 +296,23 @@ class MultiDataManagement(DBHandler):
         else:
             validated_sources = self._remove_invalid_dataset_formats(sources)
             if self.is_real_filter == True:
-                validated_sources = self._filter_non_existing_datasets(validated_sources)
+                validated_sources = self._filter_non_existing_datasets(
+                    validated_sources
+                )
             _sources = self._add_wo_duplicates(latest_source_list, validated_sources)
             sources_dict = {"sources": _sources}
             self.save(sources_dict)
-            
-
 
     def count_dataset_list(self) -> int:
         """ Get the number of data source records we've gathered so far. """
         self.check()
         count = self.count()
         return count
-    
 
     def latest_dataset_list(self) -> dict:
         self.check()
         latest_list = self.last()
         return latest_list
-
-
-
 
     def _load_dataset_list(self):
         self.check()
@@ -266,18 +321,17 @@ class MultiDataManagement(DBHandler):
             sources = latest.get("sources", [])
             if len(sources) == 0:
                 return
-            
+
             for source in sources:
                 self._is_data_exist(source)
-
 
     def _reset_dataset_list(self) -> None:
         """ Initialize with a nil set of data if nothing exist yet"""
         if self.count_dataset_list() == 0:
             self.add_multiple_data_sources([], allow_bypass=True)
-    
-    def reset_datasets(self):
-        pass
+
+    # def dump(self)
+
 
     def reset(self):
         """ Reset the data we're querying for. """
@@ -286,19 +340,15 @@ class MultiDataManagement(DBHandler):
         self.time.reset()
         self.sync()
 
-
-
-    def step(self, call_type:str="dataframe"):
+    def step(self, call_type: str = "dataframe"):
         avail_types = ["dataframe", "current"]
         if call_type not in avail_types:
             call_type = "dataframe"
-        
-        data_set = {
-            
-        }
 
+        data_set = {}
+        # We can multi-thread this
         for dataset in self.datasets:
-            dataset_name  = str(dataset)
+            dataset_name = str(dataset)
             dataset.event = self.event
             dataset.processor = self.processor
             dataset.preprocessor = self.preprocessor
@@ -309,7 +359,6 @@ class MultiDataManagement(DBHandler):
         """ Remove this time step """
         self.sync()
         return data_set
-    
 
     def sync(self):
         """ Gets all of the datahandlers and synchronize their time object """
@@ -320,14 +369,11 @@ class MultiDataManagement(DBHandler):
                 data.episode = self.episode
                 data.time = self.time
 
-    
-
-
 
 if __name__ == "__main__":
     with example_space("Multi-Data-Management") as example:
         # set_name = uuid.uuid4().hex
-        set_name = 'ac688d95336e41bdbe61c5c804d07f1a'
+        set_name = "ac688d95336e41bdbe61c5c804d07f1a"
         # jam = Jamboree()
         jam_proc = JamboreeNew()
         multi_data = MultiDataManagement()
@@ -338,20 +384,14 @@ if __name__ == "__main__":
         multi_data.reset()
         dset1 = {
             "name": "shaw",
-            "subcategories": {
-                "beautiful": "mind", 
-                "it": "is"
-            },
-            "category": "pricing"
+            "subcategories": {"beautiful": "mind", "it": "is"},
+            "category": "pricing",
         }
 
         dset2 = {
             "name": "shank",
-            "subcategories": {
-                "wonderful": "hello",
-                "king": "world"
-            },
-            "category": "pricing"
+            "subcategories": {"wonderful": "hello", "king": "world"},
+            "category": "pricing",
         }
 
         dset3 = {
@@ -359,9 +399,9 @@ if __name__ == "__main__":
             "subcategories": {
                 "market": "stock",
                 "country": "US",
-                "sector": "techologyyyyyyyy"
+                "sector": "techologyyyyyyyy",
             },
-            "category": "markets"
+            "category": "markets",
         }
 
         dset4 = {
@@ -369,12 +409,10 @@ if __name__ == "__main__":
             "subcategories": {
                 "market": "stock",
                 "country": "US",
-                "sector": "techologyyyyyyyy"
+                "sector": "techologyyyyyyyy",
             },
-            "category": "markets"
+            "category": "markets",
         }
-
-
 
         full_set = [dset1, dset2, dset3, dset4]
         pprint.pprint(multi_data.sources)
@@ -388,4 +426,4 @@ if __name__ == "__main__":
             multi_data.step()
             multi_data.time.step()
             current_time = multi_data.time.head
-            print(cy.magenta(f"Step {current_time}"))
+            print((f"Step {current_time}"))

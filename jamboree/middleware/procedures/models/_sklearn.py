@@ -11,19 +11,22 @@ from jamboree.middleware.procedures import ModelProcedureAbstract
 class SklearnProcedure(ModelProcedureAbstract):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__()
-        self.mreqs.model = True
-        self.mreqs.criterion = False
-        self.mreqs.optimizer = False
-        self.mtypes.model = BaseEstimator
+        self.requirements.model = True
+        self.requirements.criterion = False
+        self.requirements.optimizer = False
+        self.types.model = BaseEstimator
+        self.changed = False
     
 
 
     @property
     def model(self) -> BaseEstimator:
         self.verify()
-        return self.mdict.model
+        return self.dictionary.model
+        
     def set_params(self, **params):
-        pass
+        self.changed = True
+        self.model.set_params(**params)
 
     @logger.catch
     def get_params(self):
@@ -40,18 +43,19 @@ class SklearnProcedure(ModelProcedureAbstract):
 
     @logger.catch
     def partial_fit(self, X, y, **kwargs):
+        self.changed = True
         self.model.partial_fit(X, y, **kwargs)
 
     def fit(self, X, y, **kwargs):
+        self.changed = True
         self.model.fit(X, y, **kwargs)
-        # print(self.mdict.model.predict(X[:2,:], return_std=True))
 
 class CustomSklearnGaussianProcedure(SklearnProcedure):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         kernel = DotProduct() + WhiteKernel()
         gpr = GaussianProcessRegressor(kernel=kernel, random_state=0)
-        self.mdict.model = gpr
+        self.dictionary.model = gpr
 
 
 if __name__ == "__main__":

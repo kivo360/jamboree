@@ -4,7 +4,6 @@ import ujson
 from typing import List, Optional
 import redis
 from redis import Redis
-from funtime import Store
 from pebble.pool import ThreadPool
 import base64
 from multiprocessing import cpu_count
@@ -26,15 +25,6 @@ class JamboreeEvents(EventProcessor):
         self.dominant_database = ""
         self.helpers = Helpers()
         self.pool = ThreadPool(max_workers=cpu_count() * 6)
-
-        # self.store = Store(mongodb_host).create_lib('events').get_store()['events']
-        # self.mongo_conn = MongoDatabaseConnection()
-        # self.redis_conn = ZRedisDatabaseConnection()
-        
-        # # self.mongo_conn.connection = self.store
-        # self.redis_conn.connection = self.redconn
-        # self.redis_conn.pool = self.pool
-        # self.mongo_conn.pool = self.pool
     
     @property
     def rconn(self) -> redis.client.Redis:

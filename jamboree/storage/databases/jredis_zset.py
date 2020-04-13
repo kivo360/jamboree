@@ -4,12 +4,14 @@ from copy import copy
 
 
 from typing import Dict, List
-from crayons import yellow
 from pprint import pprint
 from jamboree.storage.databases import DatabaseConnection
 # from redis.exceptions import WatchError
 from jamboree.utils.context import watch_loop
 # NOTE: Can add pipelining to redis storage to make fewer calls.
+from loguru import logger
+# def default()
+
 
 class RedisDatabaseZSetsConnection(DatabaseConnection):
     """ 
@@ -109,7 +111,7 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         * `save_many` - ...
     """
 
-
+    @logger.catch
     def _save(self, _hash: str, data: dict, timing: dict):
         """ Appends an event to the stack. """
         serialized = orjson.dumps(data)
