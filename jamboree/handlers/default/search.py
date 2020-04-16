@@ -47,6 +47,13 @@ def dictify(doc, is_id=True):
 
     return item
 
+def single_doc_check_convert(doc):
+    item = doc.__dict__
+    item_conv = ADict(**item)
+    item_conv_id = item_conv.pop("id", None)
+    item_conv.pop("payload", None)
+    
+    return item_conv, bool(item_conv) 
 
 class BaseSearchHandler(BaseSearchHandlerSupport):
     def __init__(self):
@@ -168,28 +175,23 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
         return self.query_builder.build_exact()
 
     @property
-    @logger.catch
+    @logger.catch(ResponseError)
     def client(self):
         if self.current_client is None:
             # We would insert a connection here. Use the connection from the search processor to operate.
-            try:
+            with logger.catch(ResponseError):
                 self.current_client = Client(self.index, conn=self.processor.rconn)
                 if len(self.indexable) > 0:
                     self.current_client.create_index(self.indexable)
-            except ResponseError as res:
-                ress = str(res)
-                logger.error(ress)
-                # if ress == "wrong number of arguments for 'FT.CREATE' command":
-                #     raise res
         
         if self.is_sub_key:
             if not self.finished_alter:
                 for i in self.indexable:
-                    try:
+                    with logger.catch(ResponseError):
                         self.current_client.alter_schema_add([i])
-                    except ResponseError as res:
-                        logger.error(str(res))
                 self.finished_alter = True
+
+
         return self.current_client
 
     @property
@@ -246,8 +248,11 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
 
     def verbatim_docs(self):
         built = self.query_builder.build_exact()
-        q = Query(built).paging(0, 1000000)
-        
+        q = (
+                Query(built)
+                .paging(0, 1000000)
+                .no_stopwords()
+            )
         results = self.client.search(q)
         result_docs = results.docs
         return result_docs
@@ -255,7 +260,10 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
 
     def general_docs(self):
         built = self.query_builder.build()
-        q = Query(built).paging(0, 1000000)
+        q = (
+                Query(built)
+                .paging(0, 1000000)
+            )
         results = self.client.search(q)
         result_docs = results.docs
         return result_docs
@@ -338,7 +346,8 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
         return result_docs
     
     def normal_find_ids(self, limit_ids=None):
-        q = Query(self.query_builder.build()).no_content().paging(0, 1000000)
+        _query = self.query_builder.build()
+        q = Query(_query).no_content().paging(0, 1000000)
         if limit_ids is not None and len(limit_ids) > 0:
             q.limit_ids(*limit_ids)
         results = self.client.search(q)
@@ -365,11 +374,14 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
     def normal_insert(self, allow_duplicates=False):
         if allow_duplicates == False:
             verbatim_docs = self.verbatim_docs()
+
             if len(verbatim_docs) > 0 and allow_duplicates == False:
+
                 # Not adding docs because we're not allowing duplicates
-                return "", False
+                return verbatim_docs[0].id, False
         insert_variables = self.insert_builder.build()
         _doc_id = self.insert_builder.doc_id
+        # print(_doc_id)
         self.client.add_document(_doc_id, payload=_doc_id, **insert_variables)
         return _doc_id, True
 
@@ -381,6 +393,7 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
                 if len(sub.insert_builder._insert_dict) > 0:
                     sub.insert_builder.super_id = _super_id
                     sub.normal_insert(allow_duplicates=True)
+        return _super_id
 
     def find_sub_dictionaries(self, super_id):
         """ Finds a subdictionary by superid inside of the database. """
@@ -407,7 +420,12 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
             return self.sub_find()
         normal = self.normal_find()
         if len(self.subs) == 0:
-            return normal
+            results_dicts = []
+            for result in normal:
+                _id, idict = split_doc(result)
+                idict.pop("payload", None)
+                results_dicts.append(idict)
+            return results_dicts
         ndicts = []
         for i in normal:
             _i = dictify(i)
@@ -480,8 +498,23 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
                     for _id in sub_ids:
                         self.client.add_document(_id, replace=True, partial=True, **subreplacement)
                     subbatcher.commit()
-
-
+    
+    def update_id(self, _id):
+        self.set_entity()
+        self.keystore.reset()
+        doc = self.client.load_document(_id)
+        doc_dict, is_exist = single_doc_check_convert(doc)
+        
+        if not is_exist:
+            return
+        
+        replacement_variables = self.replacement.insert_builder.build()
+        self.client.add_document(_id, replace=True, partial=True, **replacement_variables)
+        doc = self.client.load_document(_id)
+        # print(doc)
+        # if len(self.subs) > 0:
+        #     subreplacement = sub.insert_builder.build()
+        #     print(subreplacement)
 
     
     
@@ -494,10 +527,12 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
         """
         self.set_entity()
         self.keystore.reset()
+        previous_id = None
         if self.use_sub_query:
-            self.sub_insert(allow_duplicates=allow_duplicates)
+            previous_id = self.sub_insert(allow_duplicates=allow_duplicates)
         else:
-            self.normal_insert(allow_duplicates=allow_duplicates)
+            previous_id, is_add = self.normal_insert(allow_duplicates=allow_duplicates)
+        return previous_id
 
 
 
@@ -523,6 +558,7 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
                     sub.client.delete_document(_id)
         else:
             norm_ids = self.normal_find_ids()
+            # print(norm_ids)
             [self.client.delete_document(_id) for _id in norm_ids]
     
 
