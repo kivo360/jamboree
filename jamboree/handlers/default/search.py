@@ -55,6 +55,13 @@ def single_doc_check_convert(doc):
     
     return item_conv, bool(item_conv) 
 
+def doc_convert(doc):
+    item = doc.__dict__
+    item_conv = ADict(**item)
+    # item_conv_id = item_conv.pop("id", None)
+    item_conv.pop("payload", None)
+    return item_conv
+
 class BaseSearchHandler(BaseSearchHandlerSupport):
     def __init__(self):
         super().__init__()
@@ -420,12 +427,9 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
             return self.sub_find()
         normal = self.normal_find()
         if len(self.subs) == 0:
-            results_dicts = []
-            for result in normal:
-                _id, idict = split_doc(result)
-                idict.pop("payload", None)
-                results_dicts.append(idict)
-            return results_dicts
+            if len(normal) > 0:
+                return [doc_convert(x) for x in normal]
+            return normal
         ndicts = []
         for i in normal:
             _i = dictify(i)
