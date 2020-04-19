@@ -50,7 +50,7 @@ class DataHandler(DBHandler):
         self._is_live = False
         self._preprocessor:DataProcessorsAbstract = DynamicResample("data")
         self.is_event = False # use to make sure there's absolutely no duplicate data 
-        # self['metatype'] = self.entity
+        self['metatype'] = self.entity
 
     @property
     def episode(self) -> str:
@@ -210,10 +210,9 @@ if __name__ == "__main__":
     print(data_apple)
     episode_id = uuid.uuid4().hex
     jambo = Jamboree()
-    jam_processor = JamboreeNew()
     data_hander = DataHandler()
     data_hander.event = jambo
-    data_hander.processor = jam_processor
+    data_hander.processor = jambo
     # The episode and live parameters are probably not good for the scenario. Will probably need to switch to something else to identify data
     data_hander.episode = episode_id
     data_hander.live = False

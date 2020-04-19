@@ -120,9 +120,15 @@ class DBHandler(BaseHandler):
         # self.processor
         # if self.event_proc is None:
         #     raise AttributeError("Event processor isn't available.")
-
-        if (not bool(self._entity)) or (not bool(self._required)) or (not bool(self._query)):
-            raise AttributeError(f"One of the key variables is missing.")
+        if (not bool(self._entity)):
+            raise AttributeError("Entity hasn't been set")
+        
+        if (not bool(self._required)):
+            raise AttributeError("None of the required information has been set")
+        
+        if (not bool(self._query)):
+            raise AttributeError("None of the queryable information has been set")
+        
 
         for req in self._required.keys():
             _type = self._required[req]

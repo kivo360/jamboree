@@ -174,7 +174,7 @@ class MultiDataManagement(DBHandler):
             self.save_dataset_list(sources)
 
     def remove_multiple_datasources(
-        self, rsources: List[Dict[str]], alt={}, allow_bypass=False
+        self, rsources: List[Dict[str, Any]], alt={}, allow_bypass=False
     ):
 
         existing = self.sources
