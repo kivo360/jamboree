@@ -46,7 +46,7 @@ class UploadCommand(Command):
 
 setup(
     name="jamboree",
-    version="0.7.0",
+    version="0.7.1",
     author="Kevin Hill",
     author_email="kah.kevin.hill@gmail.com",
     description="A multi-layer event sourcing and general data library",

@@ -9,9 +9,17 @@ class TimeHandler(DBHandler):
     """ 
         # TimeHandler
         --- 
-        The time handler is used to both do simple calculations of time and to maintain the head for what ever calculations we're working on.
+        The time handler is used to both do simple calculations of time and to maintain the head.
 
-        
+        The `head` is the current time we're referring to. 
+
+        ```
+            time_handler = TimeHandler()
+            time_handler['episode'] = "episodeid"
+            time_handler['live'] = False
+            time_handler.reset()
+            current_time:float = time_handler.head
+        ```
     """
     def __init__(self):
         super().__init__()

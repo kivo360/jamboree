@@ -16,8 +16,6 @@ from jamboree.handlers.complex.metric import MetricHandler
 from jamboree.middleware.procedures import (
     ProcedureAbstract,
     ProcedureManagement,
-    ModelProcedureAbstract,
-    ModelProcedureManagement,
 )
 from jamboree.utils.support.search import querying
 
