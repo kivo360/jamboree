@@ -46,14 +46,15 @@ class UploadCommand(Command):
 
 setup(
     name="jamboree",
-    version="0.7.1",
+    version="0.7.2",
     author="Kevin Hill",
     author_email="kah.kevin.hill@gmail.com",
-    description="A multi-layer event sourcing and general data library",
+    description="A multi-layer event sourcing and general data library. SQL, Search, Event Sourcing, and File/Model storage combined into one.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     py_modules=["jamboree"],
     install_requires=[
+        # 
         "numpy",
         "scipy",
         'maya',

@@ -129,7 +129,7 @@ class MetaHandler(DBHandler):
     def reset(self):
         self.check()
         self._reset_settings()
-        self.search.insert(allow_duplicates=False)
+        return self.search.insert(allow_duplicates=False)
     
 
 

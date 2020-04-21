@@ -83,7 +83,7 @@ class FileEngine(BacktestBlobHandler):
 
         if processor is not None:
             self.processor = processor
-
+        self.metaid = ""
         self.initialize(**kwargs)
 
     """ 
@@ -403,6 +403,6 @@ class FileEngine(BacktestBlobHandler):
         super().reset()
         self.reset_file()
         if self.is_exist_forced:
-            self.metadata.reset()
+            self.metaid = self.metadata.reset()
         self.model_reset = False
         self.metrics.reset()
