@@ -60,7 +60,7 @@ class MultiDataManagement(DBHandler):
             "submetatype":str,
             "abbreviation": str
         }
-
+        self.is_robust_closest = False
         self.initialize(**kwargs)
         self.data_handler_list: List[
             DataHandler
@@ -146,6 +146,7 @@ class MultiDataManagement(DBHandler):
             ds.processor = processor
             ds.episode = self.episode
             ds.live = self.live
+            ds.is_robust_closest = self.is_robust_closest
             is_live_list.append(ds.is_next)
 
         # Use all to determine if the values are falsey or not

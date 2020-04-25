@@ -1,10 +1,12 @@
 
 import copy
 from typing import Any, Dict, Optional
-
+import pprint
+import inspect
 from jamboree import JamboreeNew
 from jamboree.base.processors.abstracts import EventProcessor, Processor
 from jamboree.handlers.base import BaseHandler
+from jamboree.handlers.default.search import BaseSearchHandler
 from jamboree.utils.helper import Helpers
 import ujson
 
@@ -248,11 +250,32 @@ class DBHandler(BaseHandler):
         """ Get everything about this DBHandler without the event inside """
         # _event = self.event
         # self.event = _event
-        
+        current_dict = copy.copy(self.__dict__)
+        non_lock_types = {
+
+        }
         _process = self.processor
+        self._processor = None
+        for key, value in current_dict.items():
+            classified = type(value)
+            if inspect.isclass(classified):
+                if isinstance(value, BaseHandler) or issubclass(classified, BaseHandler) or issubclass(classified, BaseSearchHandler):
+                    non_lock_types[key] = value
+                    setattr(self, key, None)
+
+        
+
+        pprint.pprint(non_lock_types)
         self.clear_event()
         copied:self = copy.deepcopy(self)
         copied.processor = _process
+        for k, v in non_lock_types.items():
+            setattr(copied, k, v)
+            print(k, v)
+
+        self.__dict__ = current_dict
+        self.processor = _process
+        # pprint.pprint(self.__dict__)
         return copied
     
     def lock(self, alt={}):
