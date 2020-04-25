@@ -1,3 +1,4 @@
+import re
 import uuid
 from typing import Dict
 from loguru import logger
@@ -155,20 +156,14 @@ class QueryBuilder(object):
         self.qset[field] = placeholder
         return self
     
-    def within(self, field, _within:list):
-        """ 
-            # WITHIN
-            Essentially a `WHERE x IN` command for SQL
 
-            WHERE x IN ('foo', 'bar','hello world')
-        """
-        pass
 
     def term(self, field, _term:str, is_exact=False):
+        updated_term = re.sub('[^a-zA-Z0-9\n\.]', ' ', _term)
         placeholder = {
             "filter": "text",
             "is_exact": is_exact,
-            "value": _term
+            "value":  updated_term
         }
         self._text_fields.add(field)
         self.qset[field] = placeholder
@@ -190,6 +185,7 @@ class QueryBuilder(object):
         current = self.qset[field]
         is_exact = current.get('is_exact', False)
         _term = current.get('value', "")
+        
         if is_exact or self.all_exact:
             return f'@{field}:\"{_term}\"'
         return f"@{field}:{_term}"

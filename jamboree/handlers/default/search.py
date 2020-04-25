@@ -200,7 +200,7 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
             with logger.catch(ResponseError):
                 self.current_client = Client(self.index, conn=self.processor.rconn)
                 if len(self.indexable) > 0:
-                    self.current_client.create_index(self.indexable)
+                    self.current_client.create_index(self.indexable, stopwords=["but", "there", "these", "they", "this", "to"])
         
         if self.is_sub_key:
             if not self.finished_alter:
@@ -268,8 +268,8 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
         built = self.query_builder.build_exact()
         q = (
                 Query(built)
-                .paging(0, 1000000)
                 .no_stopwords()
+                .paging(0, 1000000)
             )
         results = self.client.search(q)
         result_docs = results.docs
@@ -354,8 +354,9 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
 
     def normal_find(self, limit_ids=None):
         built = self.query_builder.build()
-
         q = Query(built).paging(0, 1000000)
+        # print(built)
+        # print(q.query_string())
         if limit_ids is not None and len(limit_ids) > 0:
             q.limit_ids(*limit_ids)
 

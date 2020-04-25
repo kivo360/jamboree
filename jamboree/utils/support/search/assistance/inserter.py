@@ -1,3 +1,4 @@
+import re
 from typing import List
 from jamboree.utils.support.search import ( is_gen_type, is_generic, is_geo, is_valid_geo,
                                             is_nested, name_match, to_field,
@@ -81,7 +82,8 @@ def text_process_dict(field, dictionary:dict):
     if is_valid_text(values):
         is_exact = values.get("is_exact", False)
         _term = values.get("term", False)
-        return text_process(field, _term, is_exact=is_exact)
+        filtered_term = re.sub('[^a-zA-Z0-9\n\.]', ' ', _term)
+        return text_process(field, filtered_term, is_exact=is_exact)
     return {
 
     }
