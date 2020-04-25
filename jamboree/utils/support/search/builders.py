@@ -33,7 +33,6 @@ class QueryBuilder(object):
         self._general = ""
         self.all_exact = False
         self.super_id = None
-        self.charjoined = "|".join(['!', '"', '#', '$', '%', "'", '(', ')', '+', ',', '-', '/', ':', ';', '<', '=', '>', '?', '[', '\\', ']', '^', '`', '{', '}', '~'])
 
     @property
     def qset(self) -> dict:

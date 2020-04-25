@@ -182,6 +182,27 @@ class MultiDataManagement(DBHandler):
         # Use all to determine if the values are falsey or not
         return all(is_live_list)
 
+
+    @property
+    def source_ids(self) -> List[str]:
+        """Get SourceIds
+
+        Get the metadata id for the individual data sources inside of the multi-data set.
+
+        Returns
+        -------
+        List[str]
+            List of hex ids
+        """
+
+
+        _source_ids = []
+        for source in self.sources:
+            sourceid = self._get_source_id(source)
+            if sourceid is not None:
+                _source_ids.append(sourceid)
+        return _source_ids
+
     def allvalid(self, item: dict):
 
         name = item.get("name", None)
@@ -237,6 +258,7 @@ class MultiDataManagement(DBHandler):
 
     def add_dataset_handler(self):
         _copy = self.datasethandler.copy()
+
         str_copy = str(_copy)
         if str_copy in self.dup_check_list:
             return
@@ -259,6 +281,23 @@ class MultiDataManagement(DBHandler):
         if not_zero:
             self.add_dataset_handler()
         return not_zero
+    
+
+    def _get_source_id(self, source: dict) -> bool:
+        """ Check to see if the data exist when putting list of datahandlers together"""
+        self.datasethandler.event = self.event
+        self.datasethandler.processor = self.processor
+        self.datasethandler["name"] = source["name"]
+        self.datasethandler["category"] = source["category"]
+        self.datasethandler["subcategories"] = source["subcategories"]
+        self.datasethandler["submetatype"] = source["submetatype"]
+        self.datasethandler["abbreviation"] = source["abbreviation"]
+        count = self.datasethandler.count()
+        not_zero = count != 0
+
+        if not_zero:
+            return self.datasethandler.reset()
+        return None
 
     def _add_wo_duplicates(self, original_list: list, new_list: list):
         original_set = set(ujson.dumps(i, sort_keys=True) for i in original_list)
@@ -403,6 +442,7 @@ class MultiDataManagement(DBHandler):
                 data.episode = self.episode
                 data.time = self.time
 
+    
 
 if __name__ == "__main__":
     with example_space("Multi-Data-Management") as example:

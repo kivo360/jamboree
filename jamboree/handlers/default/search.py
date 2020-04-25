@@ -425,7 +425,6 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
         with logger.catch(message=f"{index_name} - {fields}", reraise=True):
             self.client.add_document(_doc_id, payload=_doc_id, **insert_variables)
 
-        logger.warning(fields)
         return _doc_id, True
 
     def sub_insert(self, allow_duplicates=False):

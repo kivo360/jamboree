@@ -50,6 +50,7 @@ class DataHandler(DBHandler):
         self._is_live = False
         self._preprocessor:DataProcessorsAbstract = DynamicResample("data")
         self.is_event = False # use to make sure there's absolutely no duplicate data 
+        self.metaid = ""
         self['metatype'] = self.entity
 
 
@@ -73,7 +74,6 @@ class DataHandler(DBHandler):
 
     @property
     def time(self) -> 'TimeHandler':
-        # self._time.event = self.event
         self._time.processor = self.processor
         self._time['episode'] = self.episode
         self._time['live'] = self.live
@@ -101,6 +101,7 @@ class DataHandler(DBHandler):
         self._metasearch['category'] = querying.text.exact(self['category'])
         self._metasearch['metatype'] = querying.text.exact(self.entity)
         self._metasearch['submetatype'] = querying.text.exact(self['submetatype'])
+        
         self._metasearch.processor = self.processor
         return self._metasearch
 
@@ -200,8 +201,9 @@ class DataHandler(DBHandler):
         """ Reset the data we're querying for. """
 
         # Update. Get the highest and lowest score for the current dataset. 
-        self.metadata.reset()
         self.time.reset()
+        self.metaid = self.metadata.reset()
+        return self.metaid
     
     
     
@@ -221,7 +223,7 @@ if __name__ == "__main__":
     import pandas_datareader.data as web
     data_msft = web.DataReader('MSFT','yahoo',start='2010/1/1',end='2020/1/30').round(2)
     data_apple = web.DataReader('AAPL','yahoo',start='2010/1/1',end='2020/1/30').round(2)
-    print(data_apple)
+    # print(data_apple)
     episode_id = uuid.uuid4().hex
     jambo = Jamboree()
     data_hander = DataHandler()
