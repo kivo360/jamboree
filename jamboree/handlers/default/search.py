@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import time
 import warnings
 from contextlib import suppress
@@ -7,10 +8,11 @@ from copy import copy
 from pprint import pprint
 from typing import Any, Dict, List, Optional
 warnings.simplefilter(action='ignore', category=FutureWarning)
+from cytoolz import unique
+
 
 from addict import Dict as ADict
 from cerberus import Validator
-from eliot import log_call, to_file
 from loguru import logger
 from redis.exceptions import ResponseError
 from redisearch import Client, Query
@@ -195,9 +197,25 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
     @property
     @logger.catch(ResponseError)
     def client(self):
+        """client
+
+        Get the client for the user. If it doesn't exist yet, create a new one with the given stop words. 
+        
+        For subkeys it adds fields if we've created them recently. 
+
+        .. code-block:: python
+
+            >>> self.client.add_document(_id, payload, **records)
+
+
+        Returns
+        -------
+        [type]
+            A redis connected client. Gets connection from Jamboree processor.
+        """
         if self.current_client is None:
             # We would insert a connection here. Use the connection from the search processor to operate.
-            with logger.catch(ResponseError):
+            with suppress(ResponseError):
                 self.current_client = Client(self.index, conn=self.processor.rconn)
                 # print(self.indexable)
                 if len(self.indexable) > 0:
@@ -206,7 +224,7 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
         if self.is_sub_key:
             if not self.finished_alter:
                 for i in self.indexable:
-                    with logger.catch(ResponseError):
+                    with suppress(ResponseError):
                         self.current_client.alter_schema_add([i])
                 self.finished_alter = True
 
@@ -222,6 +240,7 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
         """ Push a general term into the query. It can only be done once. Don't put it to a filter key."""
         if not isinstance(term, str):
             logger.error("Term isn't a string")
+            return
         self.query_builder.general = term
     
     
@@ -401,12 +420,17 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
                 return verbatim_docs[0].id, False
         insert_variables = self.insert_builder.build()
         _doc_id = self.insert_builder.doc_id
-        self.client.add_document(_doc_id, payload=_doc_id, **insert_variables)
+        index_name = self.client.index_name
+        fields = [i.redis_args()[0] for i in self.indexable]
+        with logger.catch(message=f"{index_name} - {fields}", reraise=True):
+            self.client.add_document(_doc_id, payload=_doc_id, **insert_variables)
+
+        logger.warning(fields)
         return _doc_id, True
 
     def sub_insert(self, allow_duplicates=False):
         _super_id, _did_insert = self.normal_insert(allow_duplicates=allow_duplicates)
-        logger.info(f'Did insert: {_did_insert}')
+        # logger.info(f'Did insert: {_did_insert}')
         if _did_insert:
             for key, sub in self.subs.items():
                 if len(sub.insert_builder._insert_dict) > 0:
