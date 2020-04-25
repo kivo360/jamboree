@@ -126,6 +126,7 @@ class BaseSearchHandlerSupport(object):
                     self.__indexable.append(to_field(k, "GEO"))
 
                 continue
+        
         # self._indexable = set(unique(self._indexable, key=lambda x: x.redis_args()[0]))
         if not self.is_sub_key:
             self._index_key = consistent_hash(self._requirements_str)
