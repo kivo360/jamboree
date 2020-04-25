@@ -129,7 +129,9 @@ class MetaHandler(DBHandler):
     def reset(self):
         self.check()
         self._reset_settings()
-        return self.search.insert(allow_duplicates=False)
+        qo = self.setup_query()
+        qo.pop("mtype", None)
+        return self.search.Create(allow_duplicates=False, no_overwrite_must_have=True, **qo)
     
 
 
