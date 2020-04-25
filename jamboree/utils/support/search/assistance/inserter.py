@@ -82,7 +82,7 @@ def text_process_dict(field, dictionary:dict):
     if is_valid_text(values):
         is_exact = values.get("is_exact", False)
         _term = values.get("term", False)
-        filtered_term = re.sub('[^a-zA-Z0-9\n\.]', ' ', _term)
+        filtered_term = re.sub('[^a-zA-Z0-9\n\.|\*|\@|\|\_]', ' ', _term)
         return text_process(field, filtered_term, is_exact=is_exact)
     return {
 

@@ -199,6 +199,7 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
             # We would insert a connection here. Use the connection from the search processor to operate.
             with logger.catch(ResponseError):
                 self.current_client = Client(self.index, conn=self.processor.rconn)
+                # print(self.indexable)
                 if len(self.indexable) > 0:
                     self.current_client.create_index(self.indexable, stopwords=["but", "there", "these", "they", "this", "to"])
         
@@ -400,7 +401,6 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
                 return verbatim_docs[0].id, False
         insert_variables = self.insert_builder.build()
         _doc_id = self.insert_builder.doc_id
-        # print(_doc_id)
         self.client.add_document(_doc_id, payload=_doc_id, **insert_variables)
         return _doc_id, True
 
@@ -422,6 +422,8 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
             key_dict = ADict()
             try:
                 res = sub.client.search(f'"{super_id}"')
+                if res.total == 0:
+                    continue
                 dd = [dictify(doc, False) for doc in res.docs]
                 key_dict[key] = dd[0]
             except ResponseError:
@@ -444,6 +446,7 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
             return normal
         ndicts = []
         for i in normal:
+            # print(i)
             _i = dictify(i)
             mega = self.find_sub_dictionaries(_i.id)
             if len(mega) > 0:

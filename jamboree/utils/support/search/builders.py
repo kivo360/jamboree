@@ -33,6 +33,7 @@ class QueryBuilder(object):
         self._general = ""
         self.all_exact = False
         self.super_id = None
+        self.charjoined = "|".join(['!', '"', '#', '$', '%', "'", '(', ')', '+', ',', '-', '/', ':', ';', '<', '=', '>', '?', '[', '\\', ']', '^', '`', '{', '}', '~'])
 
     @property
     def qset(self) -> dict:
@@ -159,7 +160,7 @@ class QueryBuilder(object):
 
 
     def term(self, field, _term:str, is_exact=False):
-        updated_term = re.sub('[^a-zA-Z0-9\n\.]', ' ', _term)
+        updated_term = re.sub('[^a-zA-Z0-9\n\.|\*|\@|\|\_]', ' ', _term)
         placeholder = {
             "filter": "text",
             "is_exact": is_exact,

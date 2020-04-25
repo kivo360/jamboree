@@ -9,13 +9,15 @@ import crayons as cy
 import maya
 import pandas_datareader.data as web
 import ujson
-from loguru import logger
-
 from jamboree import JamboreeNew
+from jamboree.handlers.complex.meta import MetaHandler
 from jamboree.handlers.default import DataHandler, DBHandler, TimeHandler
-from jamboree.middleware.processors import DataProcessorsAbstract, DynamicResample
+from jamboree.middleware.processors import (DataProcessorsAbstract,
+                                            DynamicResample)
 from jamboree.utils.context import example_space
 from jamboree.utils.core import consistent_hash, consistent_unhash
+from loguru import logger
+
 # NOTE: Will probably inherit this to fix it in private.
 
 
@@ -40,12 +42,10 @@ class MultiDataManagement(DBHandler):
         - Getting a superset of different asset classes to predict movements between them.
         - Getting a predefied pair to determine which signals should be used.
     """
-
     def __init__(self, **kwargs):
         super().__init__()
 
         self.entity = "multi_data_management"
-
         """ 
             # Required variables
             ---
@@ -57,15 +57,16 @@ class MultiDataManagement(DBHandler):
             "category": str,
             "subcategories": dict,
             "metatype": str,
-            "submetatype":str,
+            "submetatype": str,
             "abbreviation": str
         }
         self.is_robust_closest = False
         self.initialize(**kwargs)
-        self.data_handler_list: List[
-            DataHandler
-        ] = []  # Store the dataset objects we can access at once without redeclaring
+        self.data_handler_list: List[DataHandler] = [
+        ]  # Store the dataset objects we can access at once without redeclaring
         self.dup_check_list = []  # use to check for duplicates in dataset
+        self._meta = MetaHandler()
+        self.metaid:str = ""
 
     def initialize(self, **kwargs):
         """ A more concentrated place to initialize everything"""
@@ -76,10 +77,12 @@ class MultiDataManagement(DBHandler):
     def init_default(self, **kwargs):
         self._episode: str = kwargs.get("episode", uuid.uuid4().hex)
         self._is_live: bool = kwargs.get("live", False)
-        self._preprocessor = kwargs.get("preprocessor", DynamicResample("data"))
+        self._preprocessor = kwargs.get("preprocessor",
+                                        DynamicResample("data"))
 
         self.is_real_filter: bool = kwargs.get("real_filter", True)
         self['metatype'] = self.entity
+        self['submetatype'] = "temporary"
         self.is_event = False
 
     def init_required(self, **kwargs):
@@ -128,6 +131,17 @@ class MultiDataManagement(DBHandler):
         self._time["episode"] = self.episode
         self._time["live"] = self.live
         return self._time
+    
+    @property
+    def metadata(self):
+        self._meta.processor = self.processor
+        self._meta['name'] = self['name']
+        self._meta['category'] = self['category']
+        self._meta['subcategories'] = self['subcategories']
+        self._meta['metatype'] = self.entity
+        self._meta['submetatype'] = self['submetatype']
+        self._meta['abbreviation'] = self['abbreviation']
+        return self._meta
 
     @property
     def preprocessor(self) -> DataProcessorsAbstract:
@@ -151,39 +165,41 @@ class MultiDataManagement(DBHandler):
 
         # Use all to determine if the values are falsey or not
         return all(is_live_list)
-    
-    def allvalid(self, item:dict):
-        
-        name =          item.get("name", None)
-        category =      item.get("category", None)
+
+    def allvalid(self, item: dict):
+
+        name = item.get("name", None)
+        category = item.get("category", None)
         subcategories = item.get("subcategories", None)
-        submetatype =   item.get("submetatype", None)
-        abbreviation =  item.get("abbreviation", None)
+        submetatype = item.get("submetatype", None)
+        abbreviation = item.get("abbreviation", None)
         if None in [name, category, subcategories, submetatype, abbreviation]:
             return False
         return True
 
-    def add_multiple_data_sources(
-        self, sources: List[Dict[str, Any]], alt={}, allow_bypass=False
-    ):
+    def add_multiple_data_sources(self,
+                                  sources: List[Dict[str, Any]],
+                                  alt={},
+                                  allow_bypass=False):
         """ Add a dataset list"""
         if allow_bypass == True:
             self.save_dataset_list(sources)
             return
         is_valid = self._validate_added_sources(sources)
+        # print(is_valid)
         if is_valid:
             self.save_dataset_list(sources)
 
-    def remove_multiple_datasources(
-        self, rsources: List[Dict[str, Any]], alt={}, allow_bypass=False
-    ):
+    def remove_multiple_datasources(self,
+                                    rsources: List[Dict[str, Any]],
+                                    alt={},
+                                    allow_bypass=False):
 
         existing = self.sources
         if len(existing) == 0 or len(rsources) == 0: return
-        
+
         rhashes = set(consistent_hash(i) for i in rsources)
         ohashes = set(consistent_hash(i) for i in existing)
-        
 
         remaining_hash = ohashes - rhashes
         remaining = [consistent_unhash(x) for x in remaining_hash]
@@ -230,16 +246,18 @@ class MultiDataManagement(DBHandler):
         return not_zero
 
     def _add_wo_duplicates(self, original_list: list, new_list: list):
-        original_set = set(ujson.dumps(i, sort_keys=True) for i in original_list)
+        original_set = set(
+            ujson.dumps(i, sort_keys=True) for i in original_list)
         for item in new_list:
             frozen = ujson.dumps(item, sort_keys=True)
             original_set.add(frozen)
         return [ujson.loads(x) for x in original_set]
 
-    def _remove_invalid_dataset_formats(self, original_list: List[Dict[str, Any]]):
+    def _remove_invalid_dataset_formats(self, original_list: List[Dict[str,
+                                                                       Any]]):
         valid_list = []
         for original in original_list:
-            if self.allvalid(original):
+            if not self.allvalid(original):
                 continue
             valid_list.append(original)
         return valid_list
@@ -270,7 +288,8 @@ class MultiDataManagement(DBHandler):
 
             keys = source.keys()
             if len(keys) == 0:
-                logger.error("One of the dictionaries doesn't have a key. Skipping ...")
+                logger.error(
+                    "One of the dictionaries doesn't have a key. Skipping ...")
                 return False
 
             for key in keys:
@@ -295,12 +314,13 @@ class MultiDataManagement(DBHandler):
             sources_dict = {"sources": []}
             self.save(sources_dict)
         else:
+            # print(sources)
             validated_sources = self._remove_invalid_dataset_formats(sources)
             if self.is_real_filter == True:
                 validated_sources = self._filter_non_existing_datasets(
-                    validated_sources
-                )
-            _sources = self._add_wo_duplicates(latest_source_list, validated_sources)
+                    validated_sources)
+            _sources = self._add_wo_duplicates(latest_source_list,
+                                               validated_sources)
             sources_dict = {"sources": _sources}
             self.save(sources_dict)
 
@@ -333,13 +353,14 @@ class MultiDataManagement(DBHandler):
 
     # def dump(self)
 
-
     def reset(self):
         """ Reset the data we're querying for. """
         self._load_dataset_list()
         self._reset_dataset_list()
         self.time.reset()
         self.sync()
+        self.metaid = self.metadata.reset()
+        return self.metaid
 
     def step(self, call_type: str = "dataframe"):
         avail_types = ["dataframe", "current"]
@@ -385,13 +406,19 @@ if __name__ == "__main__":
         multi_data.reset()
         dset1 = {
             "name": "shaw",
-            "subcategories": {"beautiful": "mind", "it": "is"},
+            "subcategories": {
+                "beautiful": "mind",
+                "it": "is"
+            },
             "category": "pricing",
         }
 
         dset2 = {
             "name": "shank",
-            "subcategories": {"wonderful": "hello", "king": "world"},
+            "subcategories": {
+                "wonderful": "hello",
+                "king": "world"
+            },
             "category": "pricing",
         }
 
