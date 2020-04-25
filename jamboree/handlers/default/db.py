@@ -265,17 +265,14 @@ class DBHandler(BaseHandler):
 
         
 
-        pprint.pprint(non_lock_types)
         self.clear_event()
         copied:self = copy.deepcopy(self)
         copied.processor = _process
         for k, v in non_lock_types.items():
             setattr(copied, k, v)
-            print(k, v)
 
         self.__dict__ = current_dict
         self.processor = _process
-        # pprint.pprint(self.__dict__)
         return copied
     
     def lock(self, alt={}):
