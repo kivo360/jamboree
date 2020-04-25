@@ -74,6 +74,7 @@ class MultiDataManagement(DBHandler):
         self._meta = MetaHandler()
         self._metasearch = MetadataSearchHandler()
         self.metaid: str = ""
+        self.description = kwargs.get("description", None)
 
     def initialize(self, **kwargs):
         """ A more concentrated place to initialize everything"""
@@ -148,6 +149,7 @@ class MultiDataManagement(DBHandler):
         self._meta["metatype"] = self.entity
         self._meta["submetatype"] = self["submetatype"]
         self._meta["abbreviation"] = self["abbreviation"]
+        self._meta.description = self.description
         return self._meta
 
     @property

@@ -1,10 +1,13 @@
-import uuid
 import time
-from loguru import logger
+import uuid
+from typing import Optional
+
 import maya
-from jamboree.handlers.default import DBHandler
 from jamboree import Jamboree
 from jamboree.handlers.abstracted.search import MetadataSearchHandler
+from jamboree.handlers.default import DBHandler
+from loguru import logger
+
 
 class MetaHandler(DBHandler):
     """ 
@@ -65,7 +68,8 @@ class MetaHandler(DBHandler):
         self._search = MetadataSearchHandler()
         self._settings = {}
         self.is_auto = False
-    
+        self.description: Optional[str] = None
+
     @property
     def search(self):
         metatype = self['metatype']
@@ -94,45 +98,15 @@ class MetaHandler(DBHandler):
         self._search.processor = self.processor
         return self._search
 
-    @property
-    def settings(self):
-        """ Get the latest settings for the item (how to access, how to interact, etc) """
-        if self.is_auto: self.load_settings()
-        return self._settings
-    
-    @settings.setter
-    def settings(self, _settings):
-        self._settings = _settings
-        if self.is_auto: self.save_settings()
-
-    def count_settings(self) -> int:
-        alt = {"detail": "settings"}
-        return self.count(alt=alt)
-
-    def save_settings(self):
-        alt = {"detail": "settings"}
-        self.save(self._settings, alt=alt)
-    
-    def load_settings(self):
-        alt = {"detail": "settings"}
-        self._settings = self.last(self._settings, alt=alt)
-        return self._settings
-
-    def _reset_settings(self):
-        """ If the metadata has a count of zero, add the settings we've inputted """
-        if self.count_settings() == 0:
-            self.save_settings()
-        else:
-            self.load_settings()
-    
-    
     def reset(self):
         self.check()
-        self._reset_settings()
         qo = self.setup_query()
         qo.pop("mtype", None)
-        return self.search.Create(allow_duplicates=False, no_overwrite_must_have=True, **qo)
-    
+        if self.description is not None:
+            qo['description'] = self.description
+        return self.search.Create(allow_duplicates=False,
+                                  no_overwrite_must_have=True,
+                                  **qo)
 
 
 if __name__ == "__main__":
