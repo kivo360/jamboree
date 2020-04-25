@@ -167,6 +167,17 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
         self.replacement.requirements = _req
 
     @property
+    def allrequirements(self):
+        return self._dreq
+    
+    @allrequirements.setter
+    def allrequirements(self, _req):
+        self._dreq = _req
+        self.reset()
+        self.requirements = _req
+        self.replacement.requirements = _req
+
+    @property
     def doc_id(self):
         """ We get the current doc_id if it exists"""
 
@@ -541,14 +552,20 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
 
 
     def remove(self):
-        """
-            # REMOVE
+        """Remove all documents that match a query.
 
-            Remove all documents that match a given ID
+        Given a query, remove every document that matches the results of that query. 
+
+        ::
+            >>> search['name'] = 'sample_name'
+            >>> search['category'] = 'sample_query'
+            >>> search.remove() 
+
+
         """
         self.set_entity()
         self.keystore.reset()
-        if self.use_sub_query:
+        if self.use_sub_query and self.search_sub:
             removable = set()
             sup_ids, sub_ids = self.verbatim_sub_ids()
             norm_ids = self.normal_find_ids(limit_ids=sup_ids)

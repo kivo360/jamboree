@@ -3,7 +3,7 @@ from loguru import logger
 
 import maya
 import pandas as pd
-
+from crayons import cyan
 import ujson
 from jamboree import Jamboree
 from jamboree import JamboreeNew
@@ -51,7 +51,6 @@ class DataHandler(DBHandler):
         self._preprocessor:DataProcessorsAbstract = DynamicResample("data")
         self.is_event = False # use to make sure there's absolutely no duplicate data 
         self['metatype'] = self.entity
-        self.is_robust_closest = False
 
     @property
     def episode(self) -> str:
@@ -106,8 +105,7 @@ class DataHandler(DBHandler):
     def is_next(self) -> bool:
         """ A boolean that determines if there's anything next """
         
-        next_data = self.closest_head(is_robust=self.is_robust_closest)
-        print(next_data)
+        next_data = self.closest_head()
         next_keys = list(next_data.keys())
         if len(next_keys) == 0:
             return False
@@ -159,24 +157,21 @@ class DataHandler(DBHandler):
         frame = self._timestamp_resample_and_drop(frame)
         return frame
     
-    def closest_head(self, is_robust=False):
+    def closest_head(self):
         """ Get the closest information at the given head. Otherwise get the latest information"""
         head = self.time.head
+        count = self.count()
         closest = self.last_by(head, ar="relative")
-        
-        if is_robust == True:
-            count = self.count()
-            if len(closest) == 0:
-                if count > 0:
-                    last = self.last(ar="relative")
-                    last.pop("name", None)
-                    last.pop("mtype", None)
-                    last.pop("category", None)
-                    last.pop("subcategories", None)
-                    last.pop("type", None)
-                    return last
-                return {}
-        # print(last)
+        if len(closest) == 0:
+            if count > 0:
+                last = self.last(ar="relative")
+                last.pop("name", None)
+                last.pop("mtype", None)
+                last.pop("category", None)
+                last.pop("subcategories", None)
+                last.pop("type", None)
+                return last
+            return {}
         closest.pop("name", None)
         closest.pop("category", None)
         closest.pop("subcategories", None)
@@ -191,6 +186,7 @@ class DataHandler(DBHandler):
 
     def reset(self):
         """ Reset the data we're querying for. """
+
         self.metadata.reset()
         self.time.reset()
     
