@@ -10,6 +10,71 @@ from typing import Any, Dict, List, Optional
 warnings.simplefilter(action='ignore', category=FutureWarning)
 # from cytoolz import unique
 
+"""
+NOTE: 
+
+After working with this. I realized how much I fucked up. Will need to fix this. 
+Not only did I not know what I was doing, I rushed it and didn't design correctly.
+
+1. Sharpen the old interfaces (solid variables, consistent abstract classes)
+2. separate code way more
+3. Make take existing use cases (after I've finished this sprint) and make it easier
+4. Reduce computation requirements with dicts (objects as often as possible)
+5. Make the code super traceable
+    - This means keeping track of alters that happen.
+    - Maybe have a transition field we write to upon changing tables
+    - When you create a schema log the means in which you created that schema. 
+    - If you created a schema from a json, take note of that.
+6. Make it more decoupled and composable
+    - Take their styling, and figure out how to give it some magic. 
+    - Use modifiers 
+7. Figure out a better way of dealing with schemas (hashes all the way)
+8. Move away all of the helper functions to different spots
+9. Using classes as parameters to increase certainty in spots
+10. Ways of tracking changes with hashes
+11. Pipes in many of the places to reduce lookups
+12. Have edge cases covered all the way (you'll figure that out through use)
+13. Facade pattern
+14. Practice use cases using a facade pattern first
+    - Access the client directly if you need to.
+    - Have controlled ways of messing with pipes
+    - Move hella more code from event sourcing to this
+    - Come up with automated adds to redisearch if possible. 
+        - This will allow you to create dynamic schemas 
+15. Come up with better relational patterns (before attempting graphs)
+16. Lots of method objects if possible.
+17. Do something entirely different with the query builder (use their interface more) and perhaps a builder pattern or something.
+18. Reduce the number of loops, especially when not in C.
+19. Have some native pagination done.
+    - Configuration as a whole should be better. You improved that for managing the backtest, you can do it again for this.
+20. Enums, More Constraints and Tests
+21. Maybe having some predefined query wrappers would save time fucking with that
+22. Do more efficient queries using the info()
+23. Prevent fall off conditions for pipes
+    - Wrap the copy the current processor when using a wrapped call.
+24. Create a SchemaClass of your own
+    `
+        class RequirementsInteraction:
+            # Used to track metadata fields
+            description_fields = *fields 
+            # Figure out a way to attach a psha to the requirements, even with different variables
+            # Find a 
+            field = TypeObject(**parameters) # parameters here describe how the data will be used
+            field = TypeObject(**parameters)
+            field = TypeObject(**parameters)
+            field = TypeObject(**parameters)
+            field = TypeObject(**parameters)
+        
+        def alternative(self, schema:SearchSchema):
+            # Would search create two keys, first would be the default key, second would be the expanded one
+        
+        def prepare(self, redisearch_object):
+            # if there was any alter command lately, we would
+            pass
+    `
+
+
+"""
 
 from addict import Dict as ADict
 from cerberus import Validator
@@ -213,6 +278,7 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
         [type]
             A redis connected client. Gets connection from Jamboree processor.
         """
+        # self.processor
         if self.current_client is None:
             # We would insert a connection here. Use the connection from the search processor to operate.
             with suppress(ResponseError):
@@ -558,6 +624,9 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
         #     subreplacement = sub.insert_builder.build()
         #     print(subreplacement)
 
+    # def insert_many(self, list_of_items):
+    #     self.client.ba
+    #     pass
     
     
 
