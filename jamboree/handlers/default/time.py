@@ -324,6 +324,28 @@ class TimeHandler(DBHandler):
         peak_position = current_position._epoch
         return peak_position
     
+
+    def peak_back_num_tail(self, n:int=1) -> float:
+        """ 
+            # Peak Back Num
+            ---
+            Peak far into the future. One step head + one lookahead_params
+
+            Parameters
+            ----------
+                n: {int} - The number of steps backwards. Used to get the information.
+        """
+        if n < 1:
+            raise ValueError("Number n needs to be greater than 1")
+        head = self.head
+        step_params = self.stepsize_params
+        look_params = self.lookback_params
+        current_position = maya.MayaDT(head)
+        for _ in range(n):
+            current_position = current_position.subtract(**step_params)
+        peak_position = current_position.subtract(**look_params)._epoch
+        return peak_position
+    
     def step_back(self) -> None:
         head = self.head
         step_params = self.stepsize_params
@@ -346,3 +368,4 @@ if __name__ == "__main__":
     timehandler.head = maya.MayaDT(timehandler.head).subtract(weeks=3, days=9)._epoch
     print(maya.MayaDT(timehandler.head))
     print(maya.MayaDT(timehandler.peak_back_num(200)))
+    print(maya.MayaDT(timehandler.peak_back_num_tail(200)))

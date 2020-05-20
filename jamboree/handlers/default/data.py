@@ -161,6 +161,18 @@ class DataHandler(DBHandler):
         frame = self._timestamp_resample_and_drop(frame)
         return frame
     
+
+    def dataframe_from_dynamic_peak(self, n:int=1):
+        """ Get a dataframe between a head and tail. Resample according to our settings"""
+        
+        head = self.time.peak_back_num(n)
+        tail = self.time.peak_back_num_tail(n)
+        values = self.in_between(tail, head, ar="relative")
+        frame = pd.DataFrame(values)
+        frame = self._timestamp_resample_and_drop(frame)
+        return frame
+    
+    
     def dataframe_from_last(self):
         """ Get a dataframe with all of the last information. Resample according to our settings"""
         
