@@ -7,9 +7,10 @@ from typing import Dict, List
 from pprint import pprint
 from jamboree.storage.databases import DatabaseConnection
 # from redis.exceptions import WatchError
-from jamboree.utils.context import watch_loop
+from jamboree.utils.context import watch_loop, watch_loop_callback
 # NOTE: Can add pipelining to redis storage to make fewer calls.
 from loguru import logger
+import redis
 # def default()
 
 
@@ -63,11 +64,15 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         sub_key = f"{_hash}:single"
         value = None
         with self.connection.pipeline() as pipe:
-            with watch_loop():
-                pipe.watch(sub_key)
-                with pipe.lock(rlock):
-                    value = pipe.get(sub_key)
-                pipe.execute()
+            while True:
+                try:
+                    pipe.watch(sub_key)
+                    with pipe.lock(rlock):
+                        value = pipe.get(sub_key)
+                    pipe.execute()
+                    break
+                except redis.exceptions.WatchError:
+                    continue
                 
         return value
 
@@ -260,15 +265,21 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         relative_time_key = f"{_hash}:rlist"
         absolute_time_key = f"{_hash}:alist"
         with self.connection.pipeline() as pipe:
-            with watch_loop():
-                pipe.watch(relative_time_key)
-                pipe.watch(absolute_time_key)
-                count = self.count(_hash, pipe=pipe)
-                if count == 0: return []
-            
-                rkeys = pipe.zrange(relative_time_key, 0, -1, withscores=True)
-                akeys = pipe.zrange(absolute_time_key, 0, -1, withscores=True)
-                pipe.execute()
+            akeys=None
+            rkeys=None
+            while True:
+                try:
+                    pipe.watch(relative_time_key)
+                    pipe.watch(absolute_time_key)
+                    count = self.count(_hash, pipe=pipe)
+                    if count == 0: return []
+                
+                    rkeys = pipe.zrange(relative_time_key, 0, -1, withscores=True)
+                    akeys = pipe.zrange(absolute_time_key, 0, -1, withscores=True)
+                    pipe.execute()
+                    break
+                except redis.exceptions.WatchError:
+                    continue
         combined = self.helpers.combine_results(akeys, rkeys)
         return combined
 
@@ -279,14 +290,18 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         _current_key = self.helpers.dynamic_key(_hash, abs_rel)
 
         with self.connection.pipeline() as pipe:
-            with watch_loop():
-                pipe.watch(_current_key)
-                count = self.count(_hash, pipe=pipe)
-                if count == 0: return {}
+            while True:
+                try:
+                    pipe.watch(_current_key)
+                    count = self.count(_hash, pipe=pipe)
+                    if count == 0: return {}
 
-                keys = pipe.zrange(_current_key, -1, -1, withscores=True)
-                if len(keys) == 0: return {}
-                pipe.execute()
+                    keys = pipe.zrange(_current_key, -1, -1, withscores=True)
+                    if len(keys) == 0: return {}
+                    pipe.execute()
+                    break
+                except redis.exceptions.WatchError:
+                    continue
         combined = self.helpers.combined_abs_rel(keys, abs_rel=abs_rel)
         return combined[-1]
 
@@ -296,15 +311,20 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         _hash = self.helpers.generate_hash(_query)
         _current_key = self.helpers.dynamic_key(_hash, abs_rel)
         with self.connection.pipeline() as pipe:
-            with watch_loop():
-                pipe.watch(_current_key)
-                count = self.count(_hash, pipe=pipe)
-                if count == 0: return {}
+            while True:
+                try:
+                    pipe.watch(_current_key)
+                    count = self.count(_hash, pipe=pipe)
+                    if count == 0: return {}
 
+                    
+                    keys = pipe.zrange(_current_key, -limit, -1, withscores=True)
+                    if len(keys) == 0: return {}
+                    pipe.execute()
+                    break
+                except redis.exceptions.WatchError:
+                    continue
                 
-                keys = pipe.zrange(_current_key, -limit, -1, withscores=True)
-                if len(keys) == 0: return {}
-                pipe.execute()
         combined = self.helpers.combined_abs_rel(keys, abs_rel=abs_rel)
         return combined
 
@@ -315,13 +335,17 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         _current_key = self.helpers.dynamic_key(_hash, abs_rel)
 
         with self.connection.pipeline() as pipe:
-            with watch_loop():
-                pipe.watch(_current_key)
-                count = self.count(_hash, pipe=pipe)
-                if count == 0: return []
+            while True:
+                try:
+                    pipe.watch(_current_key)
+                    count = self.count(_hash, pipe=pipe)
+                    if count == 0: return []
 
-                keys = pipe.zrangebyscore(_current_key, min=min_epoch, max=max_epoch, withscores=True)
-                pipe.execute()
+                    keys = pipe.zrangebyscore(_current_key, min=min_epoch, max=max_epoch, withscores=True)
+                    pipe.execute()
+                    break
+                except redis.exceptions.WatchError:
+                    continue
         combined = self.helpers.combined_abs_rel(keys, abs_rel=abs_rel)
         return combined
 
@@ -333,13 +357,17 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         _hash = self.helpers.generate_hash(_query)
         _current_key = self.helpers.dynamic_key(_hash, abs_rel)
         with self.connection.pipeline() as pipe:
-            with watch_loop():
-                pipe.watch(_current_key)
-                count = self.count(_hash, pipe=pipe)
-                if count == 0: return []
-                keys = pipe.zrangebyscore(_current_key, min=max_epoch, max="+inf", start=0, num=1, withscores=True)
-                combined = self.helpers.combined_abs_rel(keys, abs_rel)
-                pipe.execute()
+            while True:
+                try:
+                    pipe.watch(_current_key)
+                    count = self.count(_hash, pipe=pipe)
+                    if count == 0: return []
+                    keys = pipe.zrangebyscore(_current_key, min=max_epoch, max="+inf", start=0, num=1, withscores=True)
+                    combined = self.helpers.combined_abs_rel(keys, abs_rel)
+                    pipe.execute()
+                    break
+                except redis.exceptions.WatchError:
+                    continue
         if len(combined) == 0:
             return {}
         return combined[0]
@@ -350,12 +378,16 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         _hash = self.helpers.generate_hash(_query)
         _current_key = self.helpers.dynamic_key(_hash, abs_rel)
         with self.connection.pipeline() as pipe:
-            with watch_loop():
-                pipe.watch(_current_key)
-                count = self.count(_hash, pipe=pipe)
-                if count == 0: return []
-                keys = pipe.zrangebyscore(_current_key, min="-inf", max=max_epoch, withscores=True)
-                pipe.execute()
+            while True:
+                try:
+                    pipe.watch(_current_key)
+                    count = self.count(_hash, pipe=pipe)
+                    if count == 0: return []
+                    keys = pipe.zrangebyscore(_current_key, min="-inf", max=max_epoch, withscores=True)
+                    pipe.execute()
+                    break
+                except redis.exceptions.WatchError:
+                    continue
         combined = self.helpers.combined_abs_rel(keys, abs_rel)
         return combined
     
@@ -365,15 +397,19 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         _hash = self.helpers.generate_hash(_query)
         _current_key = self.helpers.dynamic_key(_hash, abs_rel)
         with self.connection.pipeline() as pipe:
-            with watch_loop():
-                count = self.count(_hash, pipe=pipe)
-                if count == 0: return []
-                keys = pipe.zrangebyscore(_current_key, min=min_epoch, max="+inf", withscores=True)
-                pipe.execute()
+            while True:
+                try:
+                    count = self.count(_hash, pipe=pipe)
+                    if count == 0: return []
+                    keys = pipe.zrangebyscore(_current_key, min=min_epoch, max="+inf", withscores=True)
+                    pipe.execute()
+                    break
+                except redis.exceptions.WatchError:
+                    continue
+                
         combined = self.helpers.combined_abs_rel(keys, abs_rel)
         return combined
-
-
+    
 
     """
         Other Functions
@@ -392,17 +428,21 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         _hash_del = f"{_hash}:{delindex}"
 
         serialized_mongo = [orjson.dumps(mon) for mon in mongo_data]
-        rlock = f"{_hash}:lock"
+        # rlock = f"{_hash}:lock"
         with self.connection.pipeline() as pipe:
-            with watch_loop():
-                pipe.watch(_hash)
-                pipe.watch(_hash_placeholder)
-                pipe.watch(_hash_key)
-                pipe.connection.rpush(_hash_placeholder, *serialized_mongo)
-                pipe.connection.rename(_hash_key, _hash_del)
-                pipe.connection.rename(_hash_placeholder, _hash_key)
-                pipe.execute()
-
+            while True:
+                try:
+                    pipe.watch(_hash)
+                    pipe.watch(_hash_placeholder)
+                    pipe.watch(_hash_key)
+                    pipe.connection.rpush(_hash_placeholder, *serialized_mongo)
+                    pipe.connection.rename(_hash_key, _hash_del)
+                    pipe.connection.rename(_hash_placeholder, _hash_key)
+                    pipe.execute()
+                    break
+                except redis.exceptions.WatchError:
+                    continue
+                
         self._delete_all(_hash_del)
 
     def reset(self, query, mongo_data: List[Dict]):

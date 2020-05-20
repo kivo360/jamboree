@@ -105,7 +105,6 @@ class MetaHandler(DBHandler):
         if self.description is not None:
             qo['description'] = self.description
         
-        print(qo)
         return self.search.Create(allow_duplicates=False,
                                   no_overwrite_must_have=True,
                                   **qo)

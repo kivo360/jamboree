@@ -26,6 +26,14 @@ def watch_loop():
         except WatchError:
             continue
 
+def watch_loop_callback(callback):
+    while True:
+        try:
+            callback()
+            break
+        except WatchError:
+            continue
+
 class example_space(ContextDecorator):
     def __init__(self, name) -> None:
         self.name = name

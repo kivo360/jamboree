@@ -20,7 +20,15 @@ from jamboree.utils.context import example_space
 from jamboree.utils.core import consistent_hash, consistent_unhash
 from jamboree.utils.support.search import querying
 
-# NOTE: Will probably inherit this to fix it in private.
+
+
+"""
+    NOTE: Will probably inherit this to fix it in private.
+    This is dog shit!!!!
+    
+    A lot of this will be replaced using a task graphs (to manage relationships), redisearch aggregations and pipelines (crafting a tree of interactions)
+
+"""
 
 
 class MultiDataManagement(DBHandler):
@@ -224,7 +232,6 @@ class MultiDataManagement(DBHandler):
             self.save_dataset_list(sources)
             return
         is_valid = self._validate_added_sources(sources)
-        # print(is_valid)
         if is_valid:
             self.save_dataset_list(sources)
 
@@ -367,7 +374,6 @@ class MultiDataManagement(DBHandler):
             sources_dict = {"sources": []}
             self.save(sources_dict)
         else:
-            # print(sources)
             validated_sources = self._remove_invalid_dataset_formats(sources)
             if self.is_real_filter == True:
                 validated_sources = self._filter_non_existing_datasets(
@@ -395,7 +401,7 @@ class MultiDataManagement(DBHandler):
             sources = latest.get("sources", [])
             if len(sources) == 0:
                 return
-
+            # print(sources)
             for source in sources:
                 self._is_data_exist(source)
 
@@ -443,6 +449,32 @@ class MultiDataManagement(DBHandler):
                 data.live = self.live
                 data.episode = self.episode
                 data.time = self.time
+    
+
+    def pick(self, _id:str):
+        # Will probably make this kind of interface common. Get all information by meta_id
+        """Pick
+
+        Get multi-dataset by id
+
+        Parameters
+        ----------
+        _id : str
+            MultiData identifier
+        """
+        item = self.search.FindById(_id)
+        if item is None:
+            return None
+        _multi = MultiDataManagement()
+        _multi.processor = self.processor
+        _multi['name'] = item['name']
+        _multi['abbreviation'] = item['abbreviation']
+        _multi['submetatype'] = item['submetatype']
+        _multi['category'] = item['category']
+        _multi['metatype'] = item['metatype']
+        _multi['subcategories'] = (item['subcategories']).to_dict()
+        _multi.reset()
+        return _multi
 
     
 
