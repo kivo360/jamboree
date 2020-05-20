@@ -191,6 +191,28 @@ class DataHandler(DBHandler):
         closest.pop("type", None)
         return closest
     
+    def closest_peakback_by(self, n:int=1, is_robust=False):
+        """ Get the closest information at the given head. Otherwise get the latest information"""
+        head = self.time.peak_back_far(n)
+        count = self.count()
+        closest = self.last_by(head, ar="relative")
+        if len(closest) == 0:
+            if is_robust or self.is_robust:
+                if count > 0:
+                    last = self.last(ar="relative")
+                    last.pop("name", None)
+                    last.pop("mtype", None)
+                    last.pop("category", None)
+                    last.pop("subcategories", None)
+                    last.pop("type", None)
+                    return last
+                return {}
+        closest.pop("name", None)
+        closest.pop("category", None)
+        closest.pop("subcategories", None)
+        closest.pop("type", None)
+        return closest
+
     def previous_head(self):
         """ Get the closest information at the given head"""
         head = self.time.peak_back()

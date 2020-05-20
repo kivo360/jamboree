@@ -345,3 +345,4 @@ if __name__ == "__main__":
     print(maya.MayaDT(timehandler.head))
     timehandler.head = maya.MayaDT(timehandler.head).subtract(weeks=3, days=9)._epoch
     print(maya.MayaDT(timehandler.head))
+    print(maya.MayaDT(timehandler.peak_back_num(200)))
