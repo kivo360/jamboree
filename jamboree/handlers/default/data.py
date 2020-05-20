@@ -3,7 +3,7 @@ from loguru import logger
 
 import maya
 import pandas as pd
-
+from crayons import cyan
 import ujson
 from jamboree import Jamboree
 from jamboree import JamboreeNew
@@ -50,7 +50,11 @@ class DataHandler(DBHandler):
         self._is_live = False
         self._preprocessor:DataProcessorsAbstract = DynamicResample("data")
         self.is_event = False # use to make sure there's absolutely no duplicate data 
-        # self['metatype'] = self.entity
+        self.metaid = ""
+        self['metatype'] = self.entity
+
+
+        self.is_robust = False
 
     @property
     def episode(self) -> str:
@@ -70,7 +74,6 @@ class DataHandler(DBHandler):
 
     @property
     def time(self) -> 'TimeHandler':
-        # self._time.event = self.event
         self._time.processor = self.processor
         self._time['episode'] = self.episode
         self._time['live'] = self.live
@@ -98,6 +101,7 @@ class DataHandler(DBHandler):
         self._metasearch['category'] = querying.text.exact(self['category'])
         self._metasearch['metatype'] = querying.text.exact(self.entity)
         self._metasearch['submetatype'] = querying.text.exact(self['submetatype'])
+        
         self._metasearch.processor = self.processor
         return self._metasearch
 
@@ -157,21 +161,30 @@ class DataHandler(DBHandler):
         frame = self._timestamp_resample_and_drop(frame)
         return frame
     
-    def closest_head(self):
+    def dataframe_from_last(self):
+        """ Get a dataframe with all of the last information. Resample according to our settings"""
+        
+        values = self.many(ar="relative")
+        frame = pd.DataFrame(values)
+        frame = self._timestamp_resample_and_drop(frame)
+        return frame
+
+    def closest_head(self, is_robust=False):
         """ Get the closest information at the given head. Otherwise get the latest information"""
         head = self.time.head
         count = self.count()
         closest = self.last_by(head, ar="relative")
         if len(closest) == 0:
-            if count > 0:
-                last = self.last(ar="relative")
-                last.pop("name", None)
-                last.pop("mtype", None)
-                last.pop("category", None)
-                last.pop("subcategories", None)
-                last.pop("type", None)
-                return last
-            return {}
+            if is_robust or self.is_robust:
+                if count > 0:
+                    last = self.last(ar="relative")
+                    last.pop("name", None)
+                    last.pop("mtype", None)
+                    last.pop("category", None)
+                    last.pop("subcategories", None)
+                    last.pop("type", None)
+                    return last
+                return {}
         closest.pop("name", None)
         closest.pop("category", None)
         closest.pop("subcategories", None)
@@ -186,8 +199,11 @@ class DataHandler(DBHandler):
 
     def reset(self):
         """ Reset the data we're querying for. """
-        self.metadata.reset()
+
+        # Update. Get the highest and lowest score for the current dataset. 
         self.time.reset()
+        self.metaid = self.metadata.reset()
+        return self.metaid
     
     
     
@@ -207,13 +223,12 @@ if __name__ == "__main__":
     import pandas_datareader.data as web
     data_msft = web.DataReader('MSFT','yahoo',start='2010/1/1',end='2020/1/30').round(2)
     data_apple = web.DataReader('AAPL','yahoo',start='2010/1/1',end='2020/1/30').round(2)
-    print(data_apple)
+    # print(data_apple)
     episode_id = uuid.uuid4().hex
     jambo = Jamboree()
-    jam_processor = JamboreeNew()
     data_hander = DataHandler()
     data_hander.event = jambo
-    data_hander.processor = jam_processor
+    data_hander.processor = jambo
     # The episode and live parameters are probably not good for the scenario. Will probably need to switch to something else to identify data
     data_hander.episode = episode_id
     data_hander.live = False

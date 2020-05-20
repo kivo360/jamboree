@@ -58,9 +58,9 @@ def to_str(i):
 
 def to_field(k, v):
     if v == "BOOL":
-        return TextField(k, no_stem=True)
+        return TextField(k, sortable=True)
     elif v == "NUMERIC":
-        return NumericField(k)
+        return NumericField(k, sortable=True)
     elif v == "TEXT":
         return TextField(k)
     elif v == "TAG":

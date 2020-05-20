@@ -9,9 +9,17 @@ class TimeHandler(DBHandler):
     """ 
         # TimeHandler
         --- 
-        The time handler is used to both do simple calculations of time and to maintain the head for what ever calculations we're working on.
+        The time handler is used to both do simple calculations of time and to maintain the head.
 
-        
+        The `head` is the current time we're referring to. 
+
+        ```
+            time_handler = TimeHandler()
+            time_handler['episode'] = "episodeid"
+            time_handler['live'] = False
+            time_handler.reset()
+            current_time:float = time_handler.head
+        ```
     """
     def __init__(self):
         super().__init__()
@@ -295,6 +303,26 @@ class TimeHandler(DBHandler):
         lookahead_params = self.lookback_params
         new_head = maya.MayaDT(head).subtract(**step_params).subtract(**lookahead_params)._epoch
         return new_head
+    
+    def peak_back_num(self, n:int=1) -> float:
+        """ 
+            # Peak Back Num
+            ---
+            Peak far into the future. One step head + one lookahead_params
+
+            Parameters
+            ----------
+                n: {int} - The number of steps backwards. Used to get the information.
+        """
+        if n < 1:
+            raise ValueError("Number n needs to be greater than 1")
+        head = self.head
+        step_params = self.stepsize_params
+        current_position = maya.MayaDT(head)
+        for _ in range(n):
+            current_position = current_position.subtract(**step_params)
+        peak_position = current_position._epoch
+        return peak_position
     
     def step_back(self) -> None:
         head = self.head

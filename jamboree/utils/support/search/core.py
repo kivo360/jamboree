@@ -1,4 +1,5 @@
 import os
+
 import time
 import warnings
 from copy import copy
@@ -21,7 +22,7 @@ from jamboree.utils.support.search import (InsertBuilder, QueryBuilder,
                                            name_match, to_field, to_str)
 from jamboree.utils.support.search.assistance import Keystore
 
-
+from cytoolz import unique
 
 logger.disable(__name__)
 """
@@ -50,17 +51,20 @@ class BaseSearchHandlerSupport(object):
         }
         self._subkey_names = set()
         self._indexable = set()
+        self.__indexable = []
         self._index_key:str = ""
         self._sub_fields = {}
         self.insert_builder = InsertBuilder()
         self.query_builder = QueryBuilder()
         self.keystore = Keystore()
+        self.added = set()
         # Boolean explaining if this is a subquery
         self.is_sub_key = False
     
+    
     @property
     def indexable(self):
-        return list(self._indexable)
+        return self.__indexable
     
     @property
     def subnames(self):
@@ -97,20 +101,33 @@ class BaseSearchHandlerSupport(object):
         for k, v in _requirements.items():
             if is_generic(v):
                 sval = to_str(v)
-                self._requirements_str[k] = sval
-                field = to_field(k, sval)
-                self._indexable.add(field)
+                _agg = f"{k}:{sval}"
+                if _agg not in self.added:
+                    self.added.add(_agg)
+                    self._requirements_str[k] = sval
+                    field = to_field(k, sval)
+                    
+                    self.__indexable.append(field)
                 continue
                 
             if v == dict:
-                self._requirements_str[k] = "SUB"
-                self.subnames.add(k)
+                _agg = f"{k}:SUB"
+                if _agg not in self.added:
+                    self.added.add(_agg)
+                    self._requirements_str[k] = "SUB"
+                    self.subnames.add(k)
                 continue
 
             if is_geo(v):
-                self._requirements_str[k] = "GEO"
-                self._indexable.add(to_field(k, "GEO"))
+                _agg = f"{k}:GEO"
+                if _agg not in self.added:
+                    self.added.add(_agg)
+                    self._requirements_str[k] = "GEO"
+                    self.__indexable.append(to_field(k, "GEO"))
+
                 continue
+        
+        # self._indexable = set(unique(self._indexable, key=lambda x: x.redis_args()[0]))
         if not self.is_sub_key:
             self._index_key = consistent_hash(self._requirements_str)
             self.process_subfields()

@@ -1,1 +1,1 @@
-from .main import example_space, timecontext, watch_loop
+from .main import example_space, timecontext, watch_loop, watch_loop_callback

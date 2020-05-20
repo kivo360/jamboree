@@ -104,7 +104,7 @@ def main():
     jambo = Jamboree()
     sample_env_handler = SampleEnvHandler()
     sample_env_handler.limit = 250
-    sample_env_handler.event = jambo
+    sample_env_handler.processor = jambo
     # with timecontext():
     current_time = maya.now()._epoch
     mult = 60

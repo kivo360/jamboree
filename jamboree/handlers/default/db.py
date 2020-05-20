@@ -1,10 +1,12 @@
 
 import copy
 from typing import Any, Dict, Optional
-
+import pprint
+import inspect
 from jamboree import JamboreeNew
 from jamboree.base.processors.abstracts import EventProcessor, Processor
 from jamboree.handlers.base import BaseHandler
+from jamboree.handlers.default.search import BaseSearchHandler
 from jamboree.utils.helper import Helpers
 import ujson
 
@@ -120,9 +122,15 @@ class DBHandler(BaseHandler):
         # self.processor
         # if self.event_proc is None:
         #     raise AttributeError("Event processor isn't available.")
-
-        if (not bool(self._entity)) or (not bool(self._required)) or (not bool(self._query)):
-            raise AttributeError(f"One of the key variables is missing.")
+        if (not bool(self._entity)):
+            raise AttributeError("Entity hasn't been set")
+        
+        if (not bool(self._required)):
+            raise AttributeError("None of the required information has been set")
+        
+        if (not bool(self._query)):
+            raise AttributeError("None of the queryable information has been set")
+        
 
         for req in self._required.keys():
             _type = self._required[req]
@@ -242,11 +250,29 @@ class DBHandler(BaseHandler):
         """ Get everything about this DBHandler without the event inside """
         # _event = self.event
         # self.event = _event
-        
+        current_dict = copy.copy(self.__dict__)
+        non_lock_types = {
+
+        }
         _process = self.processor
+        self._processor = None
+        for key, value in current_dict.items():
+            classified = type(value)
+            if inspect.isclass(classified):
+                if isinstance(value, BaseHandler) or issubclass(classified, BaseHandler) or issubclass(classified, BaseSearchHandler):
+                    non_lock_types[key] = value
+                    setattr(self, key, None)
+
+        
+
         self.clear_event()
         copied:self = copy.deepcopy(self)
         copied.processor = _process
+        for k, v in non_lock_types.items():
+            setattr(copied, k, v)
+
+        self.__dict__ = current_dict
+        self.processor = _process
         return copied
     
     def lock(self, alt={}):

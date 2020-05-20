@@ -12,11 +12,23 @@ import ujson
 from loguru import logger
 
 from jamboree import JamboreeNew
+from jamboree.handlers.abstracted.search import MetadataSearchHandler
+from jamboree.handlers.complex.meta import MetaHandler
 from jamboree.handlers.default import DataHandler, DBHandler, TimeHandler
 from jamboree.middleware.processors import DataProcessorsAbstract, DynamicResample
 from jamboree.utils.context import example_space
 from jamboree.utils.core import consistent_hash, consistent_unhash
-# NOTE: Will probably inherit this to fix it in private.
+from jamboree.utils.support.search import querying
+
+
+
+"""
+    NOTE: Will probably inherit this to fix it in private.
+    This is dog shit!!!!
+    
+    A lot of this will be replaced using a task graphs (to manage relationships), redisearch aggregations and pipelines (crafting a tree of interactions)
+
+"""
 
 
 class MultiDataManagement(DBHandler):
@@ -45,7 +57,6 @@ class MultiDataManagement(DBHandler):
         super().__init__()
 
         self.entity = "multi_data_management"
-
         """ 
             # Required variables
             ---
@@ -57,15 +68,21 @@ class MultiDataManagement(DBHandler):
             "category": str,
             "subcategories": dict,
             "metatype": str,
-            "submetatype":str,
-            "abbreviation": str
+            "submetatype": str,
+            "abbreviation": str,
         }
-
+        self.is_robust = False
         self.initialize(**kwargs)
         self.data_handler_list: List[
             DataHandler
         ] = []  # Store the dataset objects we can access at once without redeclaring
         self.dup_check_list = []  # use to check for duplicates in dataset
+        
+        
+        self._meta = MetaHandler()
+        self._metasearch = MetadataSearchHandler()
+        self.metaid: str = ""
+        self.description = kwargs.get("description", None)
 
     def initialize(self, **kwargs):
         """ A more concentrated place to initialize everything"""
@@ -79,7 +96,9 @@ class MultiDataManagement(DBHandler):
         self._preprocessor = kwargs.get("preprocessor", DynamicResample("data"))
 
         self.is_real_filter: bool = kwargs.get("real_filter", True)
-        self['metatype'] = self.entity
+        self["metatype"] = self.entity
+        self["category"] = "universe"
+        self["submetatype"] = "price_bag"
         self.is_event = False
 
     def init_required(self, **kwargs):
@@ -130,6 +149,27 @@ class MultiDataManagement(DBHandler):
         return self._time
 
     @property
+    def metadata(self):
+        self._meta.processor = self.processor
+        self._meta["name"] = self["name"]
+        self._meta["category"] = self["category"]
+        self._meta["subcategories"] = self["subcategories"]
+        self._meta["metatype"] = self.entity
+        self._meta["submetatype"] = self["submetatype"]
+        self._meta["abbreviation"] = self["abbreviation"]
+        self._meta.description = self.description
+        return self._meta
+
+    @property
+    def search(self):
+        self._metasearch.reset()
+        self._metasearch["category"] = querying.text.exact(self["category"])
+        self._metasearch["metatype"] = querying.text.exact(self.entity)
+        self._metasearch["submetatype"] = querying.text.exact(self["submetatype"])
+        self._metasearch.processor = self.processor
+        return self._metasearch
+
+    @property
     def preprocessor(self) -> DataProcessorsAbstract:
         return self._preprocessor
 
@@ -146,18 +186,40 @@ class MultiDataManagement(DBHandler):
             ds.processor = processor
             ds.episode = self.episode
             ds.live = self.live
+            ds.is_robust = self.is_robust
             is_live_list.append(ds.is_next)
 
         # Use all to determine if the values are falsey or not
         return all(is_live_list)
-    
-    def allvalid(self, item:dict):
-        
-        name =          item.get("name", None)
-        category =      item.get("category", None)
+
+
+    @property
+    def source_ids(self) -> List[str]:
+        """Get SourceIds
+
+        Get the metadata id for the individual data sources inside of the multi-data set.
+
+        Returns
+        -------
+        List[str]
+            List of hex ids
+        """
+
+
+        _source_ids = []
+        for source in self.sources:
+            sourceid = self._get_source_id(source)
+            if sourceid is not None:
+                _source_ids.append(sourceid)
+        return _source_ids
+
+    def allvalid(self, item: dict):
+
+        name = item.get("name", None)
+        category = item.get("category", None)
         subcategories = item.get("subcategories", None)
-        submetatype =   item.get("submetatype", None)
-        abbreviation =  item.get("abbreviation", None)
+        submetatype = item.get("submetatype", None)
+        abbreviation = item.get("abbreviation", None)
         if None in [name, category, subcategories, submetatype, abbreviation]:
             return False
         return True
@@ -174,15 +236,15 @@ class MultiDataManagement(DBHandler):
             self.save_dataset_list(sources)
 
     def remove_multiple_datasources(
-        self, rsources: List[Dict[str]], alt={}, allow_bypass=False
+        self, rsources: List[Dict[str, Any]], alt={}, allow_bypass=False
     ):
 
         existing = self.sources
-        if len(existing) == 0 or len(rsources) == 0: return
-        
+        if len(existing) == 0 or len(rsources) == 0:
+            return
+
         rhashes = set(consistent_hash(i) for i in rsources)
         ohashes = set(consistent_hash(i) for i in existing)
-        
 
         remaining_hash = ohashes - rhashes
         remaining = [consistent_unhash(x) for x in remaining_hash]
@@ -205,6 +267,7 @@ class MultiDataManagement(DBHandler):
 
     def add_dataset_handler(self):
         _copy = self.datasethandler.copy()
+
         str_copy = str(_copy)
         if str_copy in self.dup_check_list:
             return
@@ -227,6 +290,23 @@ class MultiDataManagement(DBHandler):
         if not_zero:
             self.add_dataset_handler()
         return not_zero
+    
+
+    def _get_source_id(self, source: dict) -> bool:
+        """ Check to see if the data exist when putting list of datahandlers together"""
+        self.datasethandler.event = self.event
+        self.datasethandler.processor = self.processor
+        self.datasethandler["name"] = source["name"]
+        self.datasethandler["category"] = source["category"]
+        self.datasethandler["subcategories"] = source["subcategories"]
+        self.datasethandler["submetatype"] = source["submetatype"]
+        self.datasethandler["abbreviation"] = source["abbreviation"]
+        count = self.datasethandler.count()
+        not_zero = count != 0
+
+        if not_zero:
+            return self.datasethandler.reset()
+        return None
 
     def _add_wo_duplicates(self, original_list: list, new_list: list):
         original_set = set(ujson.dumps(i, sort_keys=True) for i in original_list)
@@ -238,7 +318,7 @@ class MultiDataManagement(DBHandler):
     def _remove_invalid_dataset_formats(self, original_list: List[Dict[str, Any]]):
         valid_list = []
         for original in original_list:
-            if self.allvalid(original):
+            if not self.allvalid(original):
                 continue
             valid_list.append(original)
         return valid_list
@@ -321,7 +401,7 @@ class MultiDataManagement(DBHandler):
             sources = latest.get("sources", [])
             if len(sources) == 0:
                 return
-
+            # print(sources)
             for source in sources:
                 self._is_data_exist(source)
 
@@ -332,13 +412,14 @@ class MultiDataManagement(DBHandler):
 
     # def dump(self)
 
-
     def reset(self):
         """ Reset the data we're querying for. """
         self._load_dataset_list()
         self._reset_dataset_list()
         self.time.reset()
         self.sync()
+        self.metaid = self.metadata.reset()
+        return self.metaid
 
     def step(self, call_type: str = "dataframe"):
         avail_types = ["dataframe", "current"]
@@ -368,7 +449,34 @@ class MultiDataManagement(DBHandler):
                 data.live = self.live
                 data.episode = self.episode
                 data.time = self.time
+    
 
+    def pick(self, _id:str):
+        # Will probably make this kind of interface common. Get all information by meta_id
+        """Pick
+
+        Get multi-dataset by id
+
+        Parameters
+        ----------
+        _id : str
+            MultiData identifier
+        """
+        item = self.search.FindById(_id)
+        if item is None:
+            return None
+        _multi = MultiDataManagement()
+        _multi.processor = self.processor
+        _multi['name'] = item['name']
+        _multi['abbreviation'] = item['abbreviation']
+        _multi['submetatype'] = item['submetatype']
+        _multi['category'] = item['category']
+        _multi['metatype'] = item['metatype']
+        _multi['subcategories'] = (item['subcategories']).to_dict()
+        _multi.reset()
+        return _multi
+
+    
 
 if __name__ == "__main__":
     with example_space("Multi-Data-Management") as example:

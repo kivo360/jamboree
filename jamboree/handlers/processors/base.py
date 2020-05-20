@@ -3,7 +3,7 @@ from typing import Any
 
 
 class DataProcessorsAbstract(ABC):
-    """ DataProcessor is used to """
+    """ DataProcessor is used to transform"""
     def __init__(self, name, **kwargs):
         self._name = name
         self.set_settings(**kwargs)

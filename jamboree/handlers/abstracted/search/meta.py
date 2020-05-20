@@ -1,7 +1,8 @@
+from jamboree.handlers.abstracted.search import ParameterizedSearch
 from jamboree.handlers.default.search import BaseSearchHandler
 
 
-class MetadataSearchHandler(BaseSearchHandler):
+class MetadataSearchHandler(ParameterizedSearch):
     """
         # 10 metatypes
 
@@ -33,5 +34,6 @@ class MetadataSearchHandler(BaseSearchHandler):
             "location": "GEO",
             "abbreviation": str
         }
+        self.must_have = ['name', 'metatype', 'category', 'submetatype', 'abbreviation']
     
     

@@ -1,0 +1,9 @@
+.git
+.gitignore
+LICENSE
+VERSION
+Changelog.md
+Makefile
+docker-compose.yml
+.gitlab-ci.yml
+README.*

@@ -170,7 +170,11 @@ class TestSearchTrial(object):
     
     def create_multi_data(self):
         self.multi_data = MultiDataManagement()
-        self.multi_data["set_name"] = self.set_name
+        self.multi_data["name"] = self.set_name
+        self.multi_data["category"] = "Sample Category"
+        self.multi_data["subcategories"] = {"extra": "info"}
+        self.multi_data["submetatype"] = "price"
+        self.multi_data["abbreviation"] = "PRC"
         self.multi_data.processor = self.processor
         self.multi_data.episode = uuid.uuid4().hex
         self.multi_data.reset()
@@ -180,17 +184,18 @@ class TestSearchTrial(object):
 
     def run_random_dataset(self):
         dataset = random.choice(self.reloaded_datasets)
+        dataset.is_robust_closest = True
         start_time = maya.now()._epoch
         i = 0
         while dataset.is_next:
             # This cuts loop time in half immediately
             dataset.time.step()
-            data = dataset.closest_head()
+            data = dataset.closest_head(is_robust=True)
             time_diff = maya.now().epoch - start_time
             i += 1
             milli = (1000 / (i / time_diff)) 
             logger.info(f"Number of milliseconds: {milli}")
-            # logger.error(data)
+            logger.info(data)
     
     def run_multidata(self):
         self.multi_data.time.head = maya.now().subtract(weeks=600, hours=14)._epoch
@@ -226,18 +231,7 @@ class TestSearchTrial(object):
         # Creates a batch dataset (pulling everything at once)
         self.create_multi_data()
         # Picks a random individual dataset and runs through it
-
-        random_pick1 = threading.Thread(target=self.run_random_dataset, args=())
-        # random_pick2 = threading.Thread(target=self.run_random_dataset, args=())
-        # multiple_pick = threading.Thread(target=self.run_multidata, args=())
-        
-        random_pick1.start()
-        # random_pick2.start()
-        # multiple_pick.start()
-
-        random_pick1.join()
-        # random_pick2.join()
-        # multiple_pick.join()
+        self.run_random_dataset()
     
     def run_findselection(self):
         self.find_all_datasets_by_exchange()
@@ -261,6 +255,6 @@ class TestSearchTrial(object):
 
 if __name__ == "__main__":
     trial = TestSearchTrial()
-    # trial.run()
-    trial.run_findselection()
+    trial.run()
+    # trial.run_findselection()
 
