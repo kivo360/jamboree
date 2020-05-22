@@ -394,6 +394,9 @@ class MultiDataManagement(DBHandler):
         latest_list = self.last()
         return latest_list
 
+
+    
+
     def _load_dataset_list(self):
         self.check()
         if self.count_dataset_list() > 0:
@@ -440,6 +443,7 @@ class MultiDataManagement(DBHandler):
         """ Remove this time step """
         self.sync()
         return data_set
+    
 
     def sync(self):
         """ Gets all of the datahandlers and synchronize their time object """

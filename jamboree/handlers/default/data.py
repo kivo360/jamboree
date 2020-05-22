@@ -205,7 +205,7 @@ class DataHandler(DBHandler):
     
     def closest_peakback_by(self, n:int=1, is_robust=False):
         """ Get the closest information at the given head. Otherwise get the latest information"""
-        head = self.time.peak_back_far(n)
+        head = self.time.peak_back_num(n)
         count = self.count()
         closest = self.last_by(head, ar="relative")
         if len(closest) == 0:
@@ -273,6 +273,8 @@ if __name__ == "__main__":
         "sector": "techologyyyyyyyy"
     }
     data_hander['name'] = "MSFT"
+    data_hander['submetatype'] = "POOP"
+    data_hander['abbreviation'] = "MSFT"
     data_hander.reset()
     data_hander.store_time_df(data_msft, is_bar=True)
 
@@ -288,5 +290,7 @@ if __name__ == "__main__":
     
     while data_hander.is_next:
         logger.debug(data_hander.time.head)
-        print(data_hander.dataframe_from_head())
+        # logger.info(data_hander.closest_peakback_by(2))
+        # logger.error(data_hander.closest_head())
+        # logger.info(data_hander.dataframe_from_dynamic_peak())
         data_hander.time.step()
