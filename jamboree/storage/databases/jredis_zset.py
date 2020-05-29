@@ -67,8 +67,7 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
             while True:
                 try:
                     pipe.watch(sub_key)
-                    with pipe.lock(rlock):
-                        value = pipe.get(sub_key)
+                    value = pipe.get(sub_key)
                     pipe.execute()
                     break
                 except redis.exceptions.WatchError:

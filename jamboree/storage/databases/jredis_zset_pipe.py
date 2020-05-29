@@ -261,13 +261,12 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         absolute_time_key = f"{_hash}:alist"
         rlock = f"{_hash}:lock"
         with self.connection.pipeline() as pipe:
-            with pipe.lock(rlock):
-                pipe.watch(relative_time_key)
-                pipe.watch(absolute_time_key)
-                rkeys = pipe.zrange(relative_time_key, 0, -1, withscores=True)
-                akeys = pipe.zrange(absolute_time_key, 0, -1, withscores=True)
-                combined = self.helpers.combine_results(akeys, rkeys)
-                pipe.execute()
+            pipe.watch(relative_time_key)
+            pipe.watch(absolute_time_key)
+            rkeys = pipe.zrange(relative_time_key, 0, -1, withscores=True)
+            akeys = pipe.zrange(absolute_time_key, 0, -1, withscores=True)
+            combined = self.helpers.combine_results(akeys, rkeys)
+            pipe.execute()
         return combined
 
     def query_latest(self, _query, abs_rel="absolute", limit:int=10):
@@ -277,16 +276,16 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         _current_key = self.helpers.dynamic_key(_hash, abs_rel)
         rlock = f"{_hash}:lock"
         with self.connection.pipeline() as pipe:
-            with pipe.lock(rlock):
-                pipe.watch(_current_key)
-                count = self.count(_hash, pipe=pipe)
-                if count == 0: return {}
+            # with pipe.lock(rlock):
+            pipe.watch(_current_key)
+            count = self.count(_hash, pipe=pipe)
+            if count == 0: return {}
 
-                
-                # logger.info(yellow(_current_key))
-                keys = pipe.zrange(_current_key, -1, -1, withscores=True)
-                if len(keys) == 0: return {}
-                pipe.execute()
+            
+            # logger.info(yellow(_current_key))
+            keys = pipe.zrange(_current_key, -1, -1, withscores=True)
+            if len(keys) == 0: return {}
+            pipe.execute()
         combined = self.helpers.combined_abs_rel(keys, abs_rel=abs_rel)
         return combined[-1]
 

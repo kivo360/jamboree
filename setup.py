@@ -46,7 +46,7 @@ class UploadCommand(Command):
 
 setup(
     name="jamboree",
-    version="0.8.0",
+    version="0.8.2",
     author="Kevin Hill",
     author_email="kah.kevin.hill@gmail.com",
     description="A multi-layer event sourcing and general data library. SQL, Search, Event Sourcing, and File/Model storage combined into one.",
@@ -77,6 +77,7 @@ setup(
         "sklearn",
         "crayons",
         "creme",
+        'pydantic',
         "yfinance",
         "version_query",
         "pandas",
