@@ -128,6 +128,9 @@ class JamboreeEvents(EventProcessor):
 
     def remove_first(self, query: dict):
         pass
+    
+    def delete_all(self, query: dict):
+        self.redis_conn.delete_all(query)
         # _hash = self._generate_hash(query)
         # count = self._get_count(_hash, query)
 

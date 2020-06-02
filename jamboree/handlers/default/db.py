@@ -246,6 +246,11 @@ class DBHandler(BaseHandler):
         query = self.setup_query(alt)
         self.processor.event.single_delete(query)
     
+    def delete_all(self, alt={}):
+        self.check()
+        query = self.setup_query(alt)
+        self.processor.event.delete_all(query)
+
     def copy(self):
         """ Get everything about this DBHandler without the event inside """
         # _event = self.event
