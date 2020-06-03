@@ -14,7 +14,8 @@ class timecontext(ContextDecorator):
     def __exit__(self, *exc):
         self.end = maya.now()._epoch
         delta = self.end - self.start
-        print(f"It took {delta}ms")
+        logger.success(f"It took {delta}s")
+        logger.success(f"It took {(delta*1000)}ms")
         return False
 
 @contextmanager
