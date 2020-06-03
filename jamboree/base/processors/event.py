@@ -255,14 +255,14 @@ class JamboreeEvents(EventProcessor):
         self.dominant_database = database
         return count
 
-    def single_get(self, query:dict):
+    def single_get(self, query:dict, is_serialized=True):
         if self._validate_query(query) == False: return {}
-        item = self.redis_conn.get(query)
+        item = self.redis_conn.get(query, is_serialized=is_serialized)
         return item 
 
-    def single_set(self, query:dict, data:dict):
+    def single_set(self, query:dict, data:dict, is_serialized=True):
         if self._validate_query(query) == False: return
-        self.redis_conn.add(query, data)
+        self.redis_conn.add(query, data, is_serialized=is_serialized)
 
     def single_delete(self, query:dict):
         if self._validate_query(query) == False: return

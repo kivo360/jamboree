@@ -3,7 +3,7 @@ import copy
 from typing import Any, Dict, Optional
 import pprint
 import inspect
-from jamboree import JamboreeNew
+from jamboree import JamboreeNew, Jamboree
 from jamboree.base.processors.abstracts import EventProcessor, Processor
 from jamboree.handlers.base import BaseHandler
 from jamboree.handlers.default.search import BaseSearchHandler
@@ -68,7 +68,7 @@ class DBHandler(BaseHandler):
         self._is_event = is_true
 
     @property
-    def processor(self) -> 'Processor':
+    def processor(self) -> Processor:
         if self._processor is None:
             raise AttributeError("The Processor is missing")
         return self._processor
@@ -230,18 +230,18 @@ class DBHandler(BaseHandler):
         return self.processor.event.count(query)
     
 
-    def get_single(self, alt={}):
+    def get_single(self, alt={}, is_serialized=True):
         self.check()
         query = self.setup_query(alt)
-        item = self.processor.event.single_get(query)
+        item = self.processor.event.single_get(query, is_serialized=is_serialized)
         return item
 
-    def set_single(self, data:dict, alt={}):
+    def set_single(self, data:dict, alt={}, is_serialized=True):
         self.check()
         query = self.setup_query(alt)
-        self.processor.event.single_set(query, data)
+        self.processor.event.single_set(query, data, is_serialized=is_serialized)
 
-    def delete_single(self, alt={}):
+    def delete_single(self, alt={}, is_dumps=False):
         self.check()
         query = self.setup_query(alt)
         self.processor.event.single_delete(query)
@@ -284,23 +284,3 @@ class DBHandler(BaseHandler):
         self.check()
         query = self.setup_query(alt)
         return self.processor.event.lock(query)
-
-    # def __str__(self) -> str:
-    #     """ 
-    #         self._entity = ""
-    #         self._required = {}
-    #         self._query = {}
-    #         self.data = {}
-    #         self.event_proc = None
-    #         self.main_helper = Helpers()
-    #         self._is_event = True
-    #     """
-    #     total_dict = {
-    #         "entity": self._entity,
-    #         "required": self._required,
-    #         "query": self._query,
-    #         "data": self.data,
-    #         "is_event": self._is_event
-    #     }
-    #     rhash = self.main_helper.generate_hash(total_dict)
-    #     return rhash

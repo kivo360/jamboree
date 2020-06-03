@@ -17,7 +17,7 @@ class Processor(ABC):
         return self._event
     
     @event.setter
-    def event(self, _event:EventProcessor):
+    def event(self, _event:EventProcessor) -> EventProcessor:
         self._event = _event
     
 

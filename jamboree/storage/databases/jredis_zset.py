@@ -50,17 +50,30 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
             pipe.execute()
     
 
-    def _add(self, _hash:str, data:dict):
+    def _add(self, _hash:str, data:dict, is_serialized=True):
+        """Set a single variable to the redis database using the redis set command. 
+
+        Arguments:
+            _hash {str} -- The hash identifier
+            data {dict} -- The data we're going to add.
+
+        Keyword Arguments:
+            is_serialized {bool} -- Determine if we're to serialize the underlying variable. (default: {False})
+        """
         rlock = f"{_hash}:lock"
         sub_key = f"{_hash}:single"
-        serialized = orjson.dumps(data)
+        serialized = None
+        if is_serialized:
+            # Don't serialize the json 
+            serialized = orjson.dumps(data)
+        else:
+            serialized = data
         with self.connection.pipeline() as pipe:
             with pipe.lock(rlock):
                 pipe.set(sub_key, serialized)
             pipe.execute()
         
     def _get(self, _hash:str):
-        rlock = f"{_hash}:lock"
         sub_key = f"{_hash}:single"
         value = None
         with self.connection.pipeline() as pipe:
@@ -79,24 +92,28 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
     
 
 
-    def get(self, query:dict):
+    def get(self, query:dict, is_serialized=True):
         if not self.helpers.validate_query(query):
             return {}
 
         _hash = self.helpers.generate_hash(query)
         value = self._get(_hash)
         if value is not None:
-            return orjson.loads(value)
+            if is_serialized:
+                return orjson.loads(value)
+            return value
         return {}
 
 
-    def add(self, query:dict, data:dict):
+    def add(self, query:dict, data:dict, is_serialized=True):
         """ Sets a single value. It's a wrapper around"""
-        if not self.helpers.validate_query(query) or len(data) == 0:
-            return
+        if not self.helpers.validate_query(query):
+            if is_serialized:
+                if len(data) == 0:
+                    return
 
         _hash = self.helpers.generate_hash(query)
-        self._add(_hash, data)
+        self._add(_hash, data, is_serialized=is_serialized)
 
 
     def kill(self, query:dict):
