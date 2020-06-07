@@ -1,6 +1,12 @@
 import functools
 import weakref
 
+from cytoolz import keyfilter
+
+
+def omit(blacklist, d):
+    return keyfilter(lambda k: k not in blacklist, d)
+
 def memoized_method(*lru_args, **lru_kwargs):
     def decorator(func):
         @functools.wraps(func)
