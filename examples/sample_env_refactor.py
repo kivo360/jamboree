@@ -1,12 +1,10 @@
 import time
 import maya
-import vaex
 import uuid
 import random
 import numpy as np
 import pandas as pd
 from copy import copy
-from crayons import red, magenta, cyan
 from loguru import logger
 from jamboree import DBHandler
 from jamboree import Jamboree
@@ -138,10 +136,8 @@ def main():
         t2 = last_by_2.get('time', time.time())
         
         logger.info(latest)
-        logger.info(magenta(last_by_time, bold=True))
         logger.success(t1)
         logger.error(t2)
-        logger.info(cyan(t1-t2, bold=True))
 
 
 if __name__ == "__main__":

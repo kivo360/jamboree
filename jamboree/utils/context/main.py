@@ -1,11 +1,12 @@
 
-from loguru import logger
-import maya
-from crayons import magenta
 from contextlib import ContextDecorator, contextmanager
-from contextlib import contextmanager
-from redis.exceptions import WatchError
+
+import maya
 import redis
+from loguru import logger
+from redis.exceptions import WatchError
+
+
 class timecontext(ContextDecorator):
     def __enter__(self):
         self.start = maya.now()._epoch
@@ -42,7 +43,6 @@ class example_space(ContextDecorator):
         self.start = maya.now()._epoch
     
     def __enter__(self):
-        logger.info(f"------------------------------------ Starting an Example: {magenta(self.name, bold=True)} --------------------------------------")
         return self
     
     def failed(self):

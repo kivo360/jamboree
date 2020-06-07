@@ -3,7 +3,6 @@ import copy
 
 from typing import Dict, Any, List
 from loguru import logger
-from crayons import red
 from .processor import EventProcessor
 
 

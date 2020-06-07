@@ -1,19 +1,21 @@
 
-import time
-import vaex
-import uuid
-import pandas as pd
-import numpy as np
-import maya
-from jamboree import Jamboree, DBHandler
 import random
-from random import randint
+import time
+import uuid
 from contextlib import ContextDecorator
-from pprint import pprint
-from crayons import blue
-from toolz.itertoolz import pluck
 from copy import copy
+from pprint import pprint
+from random import randint
+
+import maya
+import numpy as np
+import pandas as pd
 from loguru import logger
+from toolz.itertoolz import pluck
+
+import vaex
+from jamboree import DBHandler, Jamboree
+
 
 class UserSettingsHandler(DBHandler):
     """Abstract handler that we use to keep track of information.

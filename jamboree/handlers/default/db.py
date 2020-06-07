@@ -54,7 +54,6 @@ class DBHandler(BaseHandler):
     def setup_query(self, alt={}):
         return self.setup_key_with_lru(self._query, self.entity, self._metatype, self.data, alt)
 
-    @memoized_method(maxsize=1000)
     def setup_key_with_lru(self, query:dict, entity:str, metatype:str, data:dict, alt:dict):
         query = copy.copy(query)
         query['type'] = entity

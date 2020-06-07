@@ -1,10 +1,11 @@
 [tool.poetry]
 name = "jamboree"
-version = "0.6.2"
+version = "0.8.7"
 description = "A multi-layer event sourcing and general data library"
 authors = ["Kevin Hill <kah.kevin.hill@gmail.com>"]
 
 [tool.poetry.dependencies]
+python = "^3.6.8"
 numpy = "pandas"
 pandas = "^1.0.3"
 loguru = "^0.4.1"
@@ -33,8 +34,16 @@ eliot-tree = "^19.0.1"
 yfinance = "^0.1.54"
 anycache = "^2.0.7"
 tqdm = "^4.45.0"
+orjson = "^3.0.2"
+pandas-datareader = "^0.8.1"
+pydantic = "^1.5.1"
+redisearch = "^0.9.0"
+matplotlib = "^3.2.1"
 
 
+
+[tool.poetry.dev-dependencies]
+pylint = "^2.5.2"
 [build-system]
 requires = ["poetry>=0.12"]
 build-backend = "poetry.masonry.api"

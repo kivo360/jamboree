@@ -1,17 +1,18 @@
+import base64
+import random
 from abc import ABC
 from copy import copy
+from multiprocessing import cpu_count
+from typing import List
+
 import maya
 import orjson
 import ujson
-from typing import List
-from redis import Redis
-from funtime import Store
-from pebble.pool import ThreadPool
-import base64
-from multiprocessing import cpu_count
-from crayons import green, yellow
 from loguru import logger
-import random
+from pebble.pool import ThreadPool
+from redis import Redis
+
+from funtime import Store
 
 
 class EventProcessor(ABC):
@@ -536,5 +537,4 @@ class Jamboree(EventProcessor):
         _hash = self._generate_hash(query)
         count = self._get_count(_hash, query)
         if count == 0: return []
-        print(green("Querying from both :swap and :list", bold=True))
         return self._query_mix(_hash, limit=limit)

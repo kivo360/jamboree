@@ -5,7 +5,6 @@ from copy import copy
 
 from loguru import logger
 from typing import Dict, List
-from crayons import yellow
 from pprint import pprint
 from jamboree.storage.databases import DatabaseConnection
 
@@ -274,7 +273,6 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
             return {}
         _hash = self.helpers.generate_hash(_query)
         _current_key = self.helpers.dynamic_key(_hash, abs_rel)
-        rlock = f"{_hash}:lock"
         with self.connection.pipeline() as pipe:
             # with pipe.lock(rlock):
             pipe.watch(_current_key)
@@ -282,7 +280,6 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
             if count == 0: return {}
 
             
-            # logger.info(yellow(_current_key))
             keys = pipe.zrange(_current_key, -1, -1, withscores=True)
             if len(keys) == 0: return {}
             pipe.execute()
