@@ -1,16 +1,18 @@
 
 import copy
-from typing import Any, Dict, Optional
-import pprint
 import inspect
-from jamboree import JamboreeNew, Jamboree
+import pprint
+from typing import Any, Dict, Optional
+
+import ujson
+from loguru import logger
+
+from jamboree import Jamboree, JamboreeNew
 from jamboree.base.processors.abstracts import EventProcessor, Processor
 from jamboree.handlers.base import BaseHandler
 from jamboree.handlers.default.search import BaseSearchHandler
+from jamboree.utils import memoized_method
 from jamboree.utils.helper import Helpers
-import ujson
-
-from loguru import logger
 
 
 class DBHandler(BaseHandler):
@@ -50,11 +52,15 @@ class DBHandler(BaseHandler):
         return None
     
     def setup_query(self, alt={}):
-        query = copy.copy(self._query)
-        query['type'] = self.entity
-        query['mtype'] = self._metatype
+        return self.setup_key_with_lru(self._query, self.entity, self._metatype, self.data, alt)
+
+    @memoized_method(maxsize=1000)
+    def setup_key_with_lru(self, query:dict, entity:str, metatype:str, data:dict, alt:dict):
+        query = copy.copy(query)
+        query['type'] = entity
+        query['mtype'] = metatype
         query.update(alt)
-        query.update(self.data)
+        query.update(data)
         return query
 
 
