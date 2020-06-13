@@ -19,7 +19,7 @@ from jamboree.middleware.procedures import (
 )
 from jamboree.utils.support.search import querying
 
-logger.disable(__name__)
+logger.disable('jamboree')
 
 
 class FileEngine(BacktestBlobHandler):
@@ -85,6 +85,74 @@ class FileEngine(BacktestBlobHandler):
             self.processor = processor
         self.metaid = ""
         self.initialize(**kwargs)
+
+        self.__name:str = ""
+        self.__category:str = ""
+        self.__subcategories:dict = {}
+        self.__metatype:str = ""
+        self.__submetatype:str = ""
+        self.__abbreviation:str = ""
+    
+    @property
+    def name(self) -> str:
+        """The name property."""
+        return self["name"]
+    
+    @name.setter
+    def name(self, value:str):
+        self["name"] = value
+
+    @property
+    def category(self) -> str:
+        """The category property."""
+        return self["category"]
+
+
+    @category.setter
+    def category(self, value:str):
+        self["category"] = value
+
+
+    @property
+    def subcategories(self) -> dict:
+        """The subcategories property."""
+        return self["subcategories"]
+
+
+    @subcategories.setter
+    def subcategories(self, value:dict):
+        self["subcategories"] = value
+    
+
+    @property
+    def metatype(self) -> str:
+        """The metatype property."""
+        return self.entity
+    
+
+    @metatype.setter
+    def metatype(self, value:str):
+        self.entity = value
+        self["metatype"] = value
+    
+    @property
+    def submetatype(self) -> str:
+        """The submetatype property."""
+        return self['submetatype']
+    
+    @submetatype.setter
+    def submetatype(self, value:str):
+        self['submetatype'] = value
+    
+
+    @property
+    def abbreviation(self)->str:
+        """The abbreviation property."""
+        return self["abbreviation"]
+
+    @abbreviation.setter
+    def abbreviation(self, value:str):
+        self["abbreviation"] = value
 
     """ 
         Context Manager
@@ -180,13 +248,13 @@ class FileEngine(BacktestBlobHandler):
 
     @property
     def metadata(self):
-        self._meta.processor = self.processor
-        self._meta["name"] = self["name"]
-        self._meta["category"] = self["category"]
+        self._meta.processor        = self.processor
+        self._meta["name"]          = self["name"]
+        self._meta["category"]      = self["category"]
         self._meta["subcategories"] = self["subcategories"]
-        self._meta["metatype"] = self.entity
-        self._meta["submetatype"] = self['submetatype']
-        self._meta["abbreviation"] = self["abbreviation"]
+        self._meta["metatype"]      = self.entity
+        self._meta["submetatype"]   = self['submetatype']
+        self._meta["abbreviation"]  = self["abbreviation"]
         return self._meta
 
     @property
@@ -337,6 +405,7 @@ class FileEngine(BacktestBlobHandler):
 
         reloaded = self.file_from_dict(first)
         reloaded.reset()
+
         return reloaded
 
     def pick(self, _id: str):
@@ -391,7 +460,6 @@ class FileEngine(BacktestBlobHandler):
 
         if self.file_reset and not self.changed_since_command:
             return
-
         if self.is_exist_forced:
             self.reset_exist()
         else:
@@ -401,8 +469,8 @@ class FileEngine(BacktestBlobHandler):
 
     def reset(self):
         super().reset()
-        self.reset_file()
         if self.is_exist_forced:
             self.metaid = self.metadata.reset()
+        self.reset_file()
         self.model_reset = False
         self.metrics.reset()
