@@ -2,22 +2,27 @@ from abc import ABC
 from jamboree.utils.helper import Helpers
 from pebble.pool import ThreadPool
 from multiprocessing import cpu_count
+from typing import Union, Optional
+from redis import Redis
+from redis.client import Pipeline
 
 
 class DatabaseConnection(ABC):
     def __init__(self) -> None:
-        self._connection = None
+        self._connection: Optional[Union[Redis, Pipeline]] = None
         self.helpers = Helpers()
         self._pool = ThreadPool(max_workers=(cpu_count() * 2))
 
     @property
-    def connection(self):
+    def connection(self) -> Union[Redis, Pipeline]:
         if self._connection is None:
-            raise AttributeError("You haven't added a main database connection as of yet.")
+            raise AttributeError(
+                "You haven't added a main database connection as of yet."
+            )
         return self._connection
 
     @connection.setter
-    def connection(self, _conn):
+    def connection(self, _conn: Union[Redis, Pipeline]):
         self._connection = _conn
 
     @property
@@ -68,19 +73,18 @@ class DatabaseConnection(ABC):
 
     def query_latest_many(self):
         raise NotImplementedError("query_latest_many not implemented")
-    
+
     def query_between(self):
         raise NotImplementedError("query_between not implemented")
-    
+
     def query_before(self):
         raise NotImplementedError("query_before not implemented")
-    
+
     def query_after(self):
         raise NotImplementedError("query_after not implemented")
 
     def query_all(self):
         pass
-
 
     """ Other Functions """
 
@@ -89,8 +93,7 @@ class DatabaseConnection(ABC):
 
     def count(self):
         raise NotImplementedError("update_many not implemented")
-    
 
-
-    def general_lock(self, query:dict):
+    def general_lock(self, query: dict):
         raise NotImplementedError("general_lock not implemented")
+

@@ -2,15 +2,18 @@ import maya
 import orjson
 from copy import copy
 
-
-from typing import Dict, List
+from redis.client import Pipeline, Redis
+from typing import Dict, List, Optional, Any, AnyStr, Union
 from pprint import pprint
 from jamboree.storage.databases import DatabaseConnection
+
 # from redis.exceptions import WatchError
 from jamboree.utils.context import watch_loop, watch_loop_callback
+
 # NOTE: Can add pipelining to redis storage to make fewer calls.
 from loguru import logger
 import redis
+
 # def default()
 
 
@@ -40,7 +43,8 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         * add  - set a given hash/key to a variable. Usually that should be a dictionary representing a complex value.
         * get  - get a variable by hash/key
     """
-    def _kill(self, _hash:str):
+
+    def _kill(self, _hash: str):
         """ Deletes a key within a lock"""
         rlock = f"{_hash}:lock"
         sub_key = f"{_hash}:single"
@@ -48,9 +52,8 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
             with pipe.lock(rlock):
                 pipe.delete(sub_key)
             pipe.execute()
-    
 
-    def _add(self, _hash:str, data:dict, is_serialized=True):
+    def _add(self, _hash: str, data: dict, is_serialized=True):
         """Set a single variable to the redis database using the redis set command. 
 
         Arguments:
@@ -64,7 +67,7 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         sub_key = f"{_hash}:single"
         serialized = None
         if is_serialized:
-            # Don't serialize the json 
+            # Don't serialize the json
             serialized = orjson.dumps(data)
         else:
             serialized = data
@@ -72,8 +75,8 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
             with pipe.lock(rlock):
                 pipe.set(sub_key, serialized)
             pipe.execute()
-        
-    def _get(self, _hash:str):
+
+    def _get(self, _hash: str):
         sub_key = f"{_hash}:single"
         value = None
         with self.connection.pipeline() as pipe:
@@ -85,14 +88,10 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
                     break
                 except redis.exceptions.WatchError:
                     continue
-                
+
         return value
 
-
-    
-
-
-    def get(self, query:dict, is_serialized=True):
+    def get(self, query: dict, is_serialized=True):
         if not self.helpers.validate_query(query):
             return {}
 
@@ -104,8 +103,7 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
             return value
         return {}
 
-
-    def add(self, query:dict, data:dict, is_serialized=True):
+    def add(self, query: dict, data: dict, is_serialized=True):
         """ Sets a single value. It's a wrapper around"""
         if not self.helpers.validate_query(query):
             if is_serialized:
@@ -115,15 +113,13 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         _hash = self.helpers.generate_hash(query)
         self._add(_hash, data, is_serialized=is_serialized)
 
-
-    def kill(self, query:dict):
+    def kill(self, query: dict):
         """ Deletes a single variable. Bypasses the stack"""
         if not self.helpers.validate_query(query):
             return
 
         _hash = self.helpers.generate_hash(query)
         self._kill(_hash)
-
 
     """ 
         # Save Commands
@@ -141,16 +137,11 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         absolute_time_key = f"{_hash}:alist"
         with self.connection.pipeline() as pipe:
             with pipe.lock(rlock):
-                relative_data = {
-                    serialized: timing["time"]
-                }
-                absolute_data = {
-                    serialized: timing["timestamp"]
-                }
+                relative_data = {serialized: timing["time"]}
+                absolute_data = {serialized: timing["timestamp"]}
                 pipe.zadd(relative_time_key, relative_data)
                 pipe.zadd(absolute_time_key, absolute_data)
             pipe.execute()
-            
 
     def save(self, query: dict, data: dict, _time=None, _timestamp=None):
         """ Save a single record. """
@@ -184,10 +175,8 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         if not self.helpers.validate_query(query) or len(data) == 0:
             return
 
-        
         _hash = self.helpers.generate_hash(query)
         self._save_many(_hash, data)
-
 
     """ 
         # Delete Commands
@@ -217,7 +206,8 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
             return
         _hash = self.helpers.generate_hash(query)
         count = self.count(_hash)
-        if count == 0: return
+        if count == 0:
+            return
         self._delete(_hash, details)
 
     def _delete_many(self, _hash: str, data: List[Dict]):
@@ -230,21 +220,22 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         updated_list = [self.connection.update_dict(query, x) for x in data]
         _hash = self.helpers.generate_hash(query)
         count = self.count(_hash)
-        if count == 0: return
+        if count == 0:
+            return
         self._delete_many(_hash, updated_list)
 
     def _delete_all(self, _hash: str):
         rlock = f"{_hash}:lock"
         relative_time_key = f"{_hash}:rlist"
         absolute_time_key = f"{_hash}:alist"
-        
+
         with self.connection.lock(rlock):
             keys = self.connection.zrange(relative_time_key, 0, -1, withscores=True)
-    
+
             values = [key[0] for key in keys]
             if len(values) == 0:
                 return
-            
+
             self.connection.zrem(relative_time_key, *values)
             self.connection.zrem(absolute_time_key, *values)
 
@@ -254,7 +245,6 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
 
         _hash = self.helpers.generate_hash(query)
         self._delete_all(_hash)
-
 
     """
         Query commands
@@ -271,7 +261,6 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         5. `query_after` - Get everything after epoch time.    
     """
 
-
     def query_all(self, query: dict):
         """ Same as query_all """
         if not self.helpers.validate_query(query):
@@ -281,15 +270,16 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         relative_time_key = f"{_hash}:rlist"
         absolute_time_key = f"{_hash}:alist"
         with self.connection.pipeline() as pipe:
-            akeys=None
-            rkeys=None
+            akeys = None
+            rkeys = None
             while True:
                 try:
                     pipe.watch(relative_time_key)
                     pipe.watch(absolute_time_key)
                     count = self.count(_hash, pipe=pipe)
-                    if count == 0: return []
-                
+                    if count == 0:
+                        return []
+
                     rkeys = pipe.zrange(relative_time_key, 0, -1, withscores=True)
                     akeys = pipe.zrange(absolute_time_key, 0, -1, withscores=True)
                     pipe.execute()
@@ -299,8 +289,11 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         combined = self.helpers.combine_results(akeys, rkeys)
         return combined
 
-    def query_latest(self, _query, abs_rel="absolute", limit:int=10):
-        if not self.helpers.validate_query(_query) or abs_rel not in ["absolute", "relative"]:
+    def query_latest(self, _query, abs_rel="absolute", limit: int = 10):
+        if not self.helpers.validate_query(_query) or abs_rel not in [
+            "absolute",
+            "relative",
+        ]:
             return {}
         _hash = self.helpers.generate_hash(_query)
         _current_key = self.helpers.dynamic_key(_hash, abs_rel)
@@ -310,10 +303,12 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
                 try:
                     pipe.watch(_current_key)
                     count = self.count(_hash, pipe=pipe)
-                    if count == 0: return {}
+                    if count == 0:
+                        return {}
 
                     keys = pipe.zrange(_current_key, -1, -1, withscores=True)
-                    if len(keys) == 0: return {}
+                    if len(keys) == 0:
+                        return {}
                     pipe.execute()
                     break
                 except redis.exceptions.WatchError:
@@ -321,8 +316,11 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         combined = self.helpers.combined_abs_rel(keys, abs_rel=abs_rel)
         return combined[-1]
 
-    def query_latest_many(self, _query, abs_rel="absolute", limit:int=10):
-        if not self.helpers.validate_query(_query) or abs_rel not in ["absolute", "relative"]:
+    def query_latest_many(self, _query, abs_rel="absolute", limit: int = 10):
+        if not self.helpers.validate_query(_query) or abs_rel not in [
+            "absolute",
+            "relative",
+        ]:
             return {}
         _hash = self.helpers.generate_hash(_query)
         _current_key = self.helpers.dynamic_key(_hash, abs_rel)
@@ -331,21 +329,31 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
                 try:
                     pipe.watch(_current_key)
                     count = self.count(_hash, pipe=pipe)
-                    if count == 0: return {}
+                    if count == 0:
+                        return {}
 
-                    
                     keys = pipe.zrange(_current_key, -limit, -1, withscores=True)
-                    if len(keys) == 0: return {}
+                    if len(keys) == 0:
+                        return {}
                     pipe.execute()
                     break
                 except redis.exceptions.WatchError:
                     continue
-                
+
         combined = self.helpers.combined_abs_rel(keys, abs_rel=abs_rel)
         return combined
 
-    def query_between(self, _query:dict, min_epoch:float, max_epoch:float, abs_rel:str="absolute"):
-        if not self.helpers.validate_query(_query) or abs_rel not in ["absolute", "relative"]:
+    def query_between(
+        self,
+        _query: dict,
+        min_epoch: float,
+        max_epoch: float,
+        abs_rel: str = "absolute",
+    ):
+        if not self.helpers.validate_query(_query) or abs_rel not in [
+            "absolute",
+            "relative",
+        ]:
             return []
         _hash = self.helpers.generate_hash(_query)
         _current_key = self.helpers.dynamic_key(_hash, abs_rel)
@@ -355,9 +363,12 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
                 try:
                     pipe.watch(_current_key)
                     count = self.count(_hash, pipe=pipe)
-                    if count == 0: return []
+                    if count == 0:
+                        return []
 
-                    keys = pipe.zrangebyscore(_current_key, min=min_epoch, max=max_epoch, withscores=True)
+                    keys = pipe.zrangebyscore(
+                        _current_key, min=min_epoch, max=max_epoch, withscores=True
+                    )
                     pipe.execute()
                     break
                 except redis.exceptions.WatchError:
@@ -366,10 +377,48 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         return combined
 
 
-    def query_latest_by_time(self, _query, max_epoch, abs_rel="absolute", limit:int=10):
+    def query_all_between(
+        self,
+        _query: dict,
+        abs_rel: str = "absolute",
+    ):
+        if not self.helpers.validate_query(_query) or abs_rel not in [
+            "absolute",
+            "relative",
+        ]:
+            return []
+        _hash = self.helpers.generate_hash(_query)
+        _current_key = self.helpers.dynamic_key(_hash, abs_rel)
+
+        with self.connection.pipeline() as pipe:
+            while True:
+                try:
+                    pipe.watch(_current_key)
+                    count = self.count(_hash, pipe=pipe)
+                    min_epoch = self.min_score(_hash, pipe=pipe)
+                    max_epoch = self.max_score(_hash, pipe=pipe)
+                    if count == 0:
+                        return []
+
+                    keys = pipe.zrangebyscore(
+                        _current_key, min=min_epoch, max=max_epoch, withscores=True
+                    )
+                    pipe.execute()
+                    break
+                except redis.exceptions.WatchError:
+                    continue
+        combined = self.helpers.combined_abs_rel(keys, abs_rel=abs_rel)
+        return combined
+
+    def query_latest_by_time(
+        self, _query, max_epoch, abs_rel="absolute", limit: int = 10
+    ):
         """ Get the closest item to a given timestamp. Simply pass in an epoch then watch things fly"""
-        if not self.helpers.validate_query(_query) or abs_rel not in ["absolute", "relative"]:
-            return  []
+        if not self.helpers.validate_query(_query) or abs_rel not in [
+            "absolute",
+            "relative",
+        ]:
+            return []
         _hash = self.helpers.generate_hash(_query)
         _current_key = self.helpers.dynamic_key(_hash, abs_rel)
         with self.connection.pipeline() as pipe:
@@ -377,8 +426,16 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
                 try:
                     pipe.watch(_current_key)
                     count = self.count(_hash, pipe=pipe)
-                    if count == 0: return []
-                    keys = pipe.zrangebyscore(_current_key, min=max_epoch, max="+inf", start=0, num=1, withscores=True)
+                    if count == 0:
+                        return []
+                    keys = pipe.zrangebyscore(
+                        _current_key,
+                        min=max_epoch,
+                        max="+inf",
+                        start=0,
+                        num=1,
+                        withscores=True,
+                    )
                     combined = self.helpers.combined_abs_rel(keys, abs_rel)
                     pipe.execute()
                     break
@@ -387,9 +444,12 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         if len(combined) == 0:
             return {}
         return combined[0]
-    
+
     def query_before(self, _query, max_epoch, abs_rel="absolute"):
-        if not self.helpers.validate_query(_query) or abs_rel not in ["absolute", "relative"]:
+        if not self.helpers.validate_query(_query) or abs_rel not in [
+            "absolute",
+            "relative",
+        ]:
             return []
         _hash = self.helpers.generate_hash(_query)
         _current_key = self.helpers.dynamic_key(_hash, abs_rel)
@@ -398,17 +458,23 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
                 try:
                     pipe.watch(_current_key)
                     count = self.count(_hash, pipe=pipe)
-                    if count == 0: return []
-                    keys = pipe.zrangebyscore(_current_key, min="-inf", max=max_epoch, withscores=True)
+                    if count == 0:
+                        return []
+                    keys = pipe.zrangebyscore(
+                        _current_key, min="-inf", max=max_epoch, withscores=True
+                    )
                     pipe.execute()
                     break
                 except redis.exceptions.WatchError:
                     continue
         combined = self.helpers.combined_abs_rel(keys, abs_rel)
         return combined
-    
+
     def query_after(self, _query, min_epoch, abs_rel="absolute"):
-        if not self.helpers.validate_query(_query) or abs_rel not in ["absolute", "relative"]:
+        if not self.helpers.validate_query(_query) or abs_rel not in [
+            "absolute",
+            "relative",
+        ]:
             return []
         _hash = self.helpers.generate_hash(_query)
         _current_key = self.helpers.dynamic_key(_hash, abs_rel)
@@ -416,16 +482,18 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
             while True:
                 try:
                     count = self.count(_hash, pipe=pipe)
-                    if count == 0: return []
-                    keys = pipe.zrangebyscore(_current_key, min=min_epoch, max="+inf", withscores=True)
+                    if count == 0:
+                        return []
+                    keys = pipe.zrangebyscore(
+                        _current_key, min=min_epoch, max="+inf", withscores=True
+                    )
                     pipe.execute()
                     break
                 except redis.exceptions.WatchError:
                     continue
-                
+
         combined = self.helpers.combined_abs_rel(keys, abs_rel)
         return combined
-    
 
     """
         Other Functions
@@ -458,11 +526,12 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
                     break
                 except redis.exceptions.WatchError:
                     continue
-                
+
         self._delete_all(_hash_del)
 
     def reset(self, query, mongo_data: List[Dict]):
-        if not self.helpers.validate_query(query): return
+        if not self.helpers.validate_query(query):
+            return
         self.pool.schedule(self._reset_count, args=(query, mongo_data))
 
     def count(self, _hash: str, pipe=None) -> int:
@@ -474,8 +543,8 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         else:
             count = self.connection.zcard(_count_hash)
         return int(count)
-    
-    def general_lock(self, query:dict):
+
+    def general_lock(self, query: dict):
         """ 
             Use this lock to wrap around step functions. 
             It would prevent race conditions on the same object (portfolio manipulation)
@@ -483,3 +552,53 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         _hash = self.helpers.generate_hash(query)
         general_key = f"{_hash}:lock:generalized"
         return self.connection.lock(general_key)
+
+    def max_score(self, _hash: str, pipe: Optional[Pipeline] = None):
+        """max_score Get Max Score
+
+            Get the max score given a key. We get the maximum score and cache it. 
+            If we change any information we can swap the cache out dynamically to increase access speed.
+        """
+        _count_hash = f"{_hash}:alist"
+        if pipe is not None:
+            pipe.watch(_count_hash)
+            count = pipe.zrangebyscore(
+                min="+inf", max="-inf", start=0, num=1, withscores=True
+            )
+        else:
+            count = self.connection.zrangebyscore(
+                min="+inf", max="-inf", start=0, num=1, withscores=True
+            )
+
+        if count is None:
+            return float(0.0)
+
+        if isinstance(count, dict) and len(count) > 0:
+            return float(count.keys()[0])
+        return float(0.0)
+
+    def min_score(self, _hash: str, pipe: Optional[Pipeline] = None):
+        """min_score Get Minimum Score
+
+            Get the min score given a key. We get the maximum score and cache it. 
+            If we change any information we can swap the cache out dynamically to increase access speed.
+        """
+        _count_hash = f"{_hash}:alist"
+        first_dict: Optional[Dict[AnyStr, Any]] = None
+
+        if pipe is not None:
+            pipe.watch(_count_hash)
+            first_dict = pipe.zrangebyscore(
+                min="-inf", max="+inf", start=0, num=1, withscores=True
+            )
+        else:
+            first_dict = self.connection.zrangebyscore(
+                min="-inf", max="+inf", start=0, num=1, withscores=True
+            )
+
+        if first_dict is None:
+            return float(0.0)
+
+        if isinstance(first_dict, dict) and len(first_dict) > 0:
+            return float(first_dict.keys()[0])
+        return float(0.0)
