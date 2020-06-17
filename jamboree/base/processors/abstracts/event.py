@@ -28,7 +28,10 @@ class EventProcessor(ABC):
 
     def get_latest_by(self, query:dict, max_epoch, abs_rel="absolute", limit:int=10) -> dict:
         raise NotImplementedError
+    
 
+    def get_all(self, query:dict, abs_rel:str="relative"):
+        raise NotImplementedError
 
     def count(self, query: dict) -> int:
         raise NotImplementedError

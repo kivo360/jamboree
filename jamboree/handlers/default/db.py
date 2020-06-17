@@ -2,7 +2,7 @@
 import copy
 import inspect
 import pprint
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, AnyStr
 
 import ujson
 from loguru import logger
@@ -255,6 +255,24 @@ class DBHandler(BaseHandler):
         self.check()
         query = self.setup_query(alt)
         self.processor.event.delete_all(query)
+
+    def query_all(self, alt:Dict[AnyStr, Any]={}):
+        self.check()
+        query = self.setup_query(alt)
+        items = self.processor.event.get_all(query)
+        return items
+
+    def get_minimum_time(self, query:dict, alt:Dict[AnyStr, Any]={}):
+        self.check()
+        _query = self.setup_query(alt)
+        _time = self.processor.event.min_time(_query)
+        return _time
+
+    def get_maximum_time(self, query:dict, alt:Dict[AnyStr, Any]={}):
+        self.check()
+        _query = self.setup_query(alt)
+        _time = self.processor.event.max_time(_query)
+        return _time
 
     def copy(self):
         """ Get everything about this DBHandler without the event inside """

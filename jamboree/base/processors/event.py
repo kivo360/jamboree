@@ -223,6 +223,11 @@ class JamboreeEvents(EventProcessor):
         item = self.redis_conn.query_latest_by_time(query, max_epoch, abs_rel)
         return item
 
+
+    def get_all(self, query:dict, abs_rel:str="relative"):
+        items = self.redis_conn.query_all(query)
+        return items
+
     """
         SEARCH ONE FUNCTIONS
     """
@@ -273,3 +278,11 @@ class JamboreeEvents(EventProcessor):
             raise ValueError("The query isn't correct")
         
         return self.redis_conn.general_lock(query)
+    
+    def max_time(self, query:dict):
+        _hash = self._generate_hash(query)
+        return self.redis_conn.max_score(_hash)
+
+    def min_time(self, query:dict):
+        _hash = self._generate_hash(query)
+        return self.redis_conn.min_score(_hash)
