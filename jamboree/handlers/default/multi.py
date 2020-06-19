@@ -14,7 +14,7 @@ from loguru import logger
 from jamboree import JamboreeNew
 from jamboree.handlers.abstracted.search import MetadataSearchHandler
 from jamboree.handlers.complex.meta import MetaHandler
-from jamboree.handlers.default import DataHandler, DBHandler, TimeHandler
+from jamboree.handlers.default import DataHandler, DBHandler, TimeHandler, Access
 from jamboree.middleware.processors import DataProcessorsAbstract, DynamicResample
 from jamboree.utils.context import example_space
 from jamboree.utils.core import consistent_hash, consistent_unhash
@@ -31,7 +31,7 @@ from jamboree.utils.support.search import querying
 """
 
 
-class MultiDataManagement(DBHandler):
+class MultiDataManagement(Access):
     """ 
         # Multi-Data Handler
         ---
@@ -96,9 +96,14 @@ class MultiDataManagement(DBHandler):
         self._preprocessor = kwargs.get("preprocessor", DynamicResample("data"))
 
         self.is_real_filter: bool = kwargs.get("real_filter", True)
-        self["metatype"] = self.entity
-        self["category"] = "universe"
-        self["submetatype"] = "price_bag"
+        self.metatype = self.entity
+        self.category = "universe"
+        self.submetatype = "price_bag"
+
+        # self["metatype"] = self.entity
+        # self["category"] = "universe"
+        # self["submetatype"] = "price_bag"
+        
         self.is_event = False
 
     def init_required(self, **kwargs):
@@ -151,21 +156,21 @@ class MultiDataManagement(DBHandler):
     @property
     def metadata(self):
         self._meta.processor = self.processor
-        self._meta["name"] = self["name"]
-        self._meta["category"] = self["category"]
-        self._meta["subcategories"] = self["subcategories"]
+        self._meta["name"] = self.name
+        self._meta["category"] = self.category
+        self._meta["subcategories"] = self.subcategories
         self._meta["metatype"] = self.entity
-        self._meta["submetatype"] = self["submetatype"]
-        self._meta["abbreviation"] = self["abbreviation"]
+        self._meta["submetatype"] = self.submetatype
+        self._meta["abbreviation"] = self.abbreviation
         self._meta.description = self.description
         return self._meta
 
     @property
     def search(self):
         self._metasearch.reset()
-        self._metasearch["category"] = querying.text.exact(self["category"])
+        self._metasearch["category"] = querying.text.exact(self.category)
         self._metasearch["metatype"] = querying.text.exact(self.entity)
-        self._metasearch["submetatype"] = querying.text.exact(self["submetatype"])
+        self._metasearch["submetatype"] = querying.text.exact(self.submetatype)
         self._metasearch.processor = self.processor
         return self._metasearch
 
@@ -184,8 +189,8 @@ class MultiDataManagement(DBHandler):
         is_live_list: List[bool] = []
         for ds in self.datasets:
             ds.processor = processor
-            ds.episode = self.episode
-            ds.live = self.live
+            ds.episode   = self.episode
+            ds.live      = self.live
             ds.is_robust = self.is_robust
             is_live_list.append(ds.is_next)
 
@@ -294,13 +299,13 @@ class MultiDataManagement(DBHandler):
 
     def _get_source_id(self, source: dict) -> bool:
         """ Check to see if the data exist when putting list of datahandlers together"""
-        self.datasethandler.event = self.event
-        self.datasethandler.processor = self.processor
-        self.datasethandler["name"] = source["name"]
-        self.datasethandler["category"] = source["category"]
-        self.datasethandler["subcategories"] = source["subcategories"]
-        self.datasethandler["submetatype"] = source["submetatype"]
-        self.datasethandler["abbreviation"] = source["abbreviation"]
+        self.datasethandler.event               = self.event
+        self.datasethandler.processor           = self.processor
+        self.datasethandler["name"]             = source["name"]
+        self.datasethandler["category"]         = source["category"]
+        self.datasethandler["subcategories"]    = source["subcategories"]
+        self.datasethandler["submetatype"]      = source["submetatype"]
+        self.datasethandler["abbreviation"]     = source["abbreviation"]
         count = self.datasethandler.count()
         not_zero = count != 0
 
@@ -469,13 +474,13 @@ class MultiDataManagement(DBHandler):
         item = self.search.FindById(_id)
         if item is None:
             return None
-        _multi = MultiDataManagement()
-        _multi.processor = self.processor
-        _multi['name'] = item['name']
-        _multi['abbreviation'] = item['abbreviation']
-        _multi['submetatype'] = item['submetatype']
-        _multi['category'] = item['category']
-        _multi['metatype'] = item['metatype']
+        _multi                  = MultiDataManagement()
+        _multi.processor        = self.processor
+        _multi['name']          = item['name']
+        _multi['abbreviation']  = item['abbreviation']
+        _multi['submetatype']   = item['submetatype']
+        _multi['category']      = item['category']
+        _multi['metatype']      = item['metatype']
         _multi['subcategories'] = (item['subcategories']).to_dict()
         _multi.reset()
         return _multi

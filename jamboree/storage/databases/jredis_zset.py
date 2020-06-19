@@ -553,31 +553,68 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         general_key = f"{_hash}:lock:generalized"
         return self.connection.lock(general_key)
 
-    def max_score(self, _hash: str, pipe: Optional[Pipeline] = None):
+    def min_score(self, _hash: str, pipe: Optional[Pipeline] = None):
         """max_score Get Max Score
 
             Get the max score given a key. We get the maximum score and cache it. 
             If we change any information we can swap the cache out dynamically to increase access speed.
         """
-        _count_hash = f"{_hash}:alist"
+        _count_hash = f"{_hash}:rlist"
         if pipe is not None:
             pipe.watch(_count_hash)
             count = pipe.zrangebyscore(
-                min="+inf", max="-inf", start=0, num=1, withscores=True
-            )
-        else:
-            count = self.connection.zrangebyscore(
-                min="+inf", max="-inf", start=0, num=1, withscores=True
+                start=0, num=1,
+                name=_count_hash,
+                min="-inf", max="+inf", 
+                withscores=True
             )
 
+        else:
+            count = self.connection.zrangebyscore(
+                name=_count_hash,
+                start=0, num=1,
+                min="-inf", max="+inf", 
+                withscores=True
+            )
         if count is None:
             return float(0.0)
 
-        if isinstance(count, dict) and len(count) > 0:
-            return float(count.keys()[0])
+        if len(count) > 0:
+            return float(count[0][1])
         return float(0.0)
 
-    def min_score(self, _hash: str, pipe: Optional[Pipeline] = None):
+
+    # def max_score(self, _hash: str, pipe: Optional[Pipeline] = None):
+    #     """max_score Get Max Score
+
+    #         Get the max score given a key. We get the maximum score and cache it. 
+    #         If we change any information we can swap the cache out dynamically to increase access speed.
+    #     """
+    #     _count_hash = f"{_hash}:rlist"
+    #     if pipe is not None:
+    #         pipe.watch(_count_hash)
+    #         count = pipe.zrangebyscore(
+    #             start=0, num=1,
+    #             name=_count_hash,
+    #             min="-inf", max="+inf", 
+    #             withscores=True
+    #         )
+
+    #     else:
+    #         count = self.connection.zrangebyscore(
+    #             name=_count_hash,
+    #             start=0, num=1,
+    #             min="-inf", max="+inf", 
+    #             withscores=True
+    #         )
+    #     if count is None:
+    #         return float(0.0)
+
+    #     if len(count) > 0:
+    #         return float(count[0][1])
+    #     return float(0.0)
+
+    def max_score(self, _hash: str, pipe: Optional[Pipeline] = None):
         """min_score Get Minimum Score
 
             Get the min score given a key. We get the maximum score and cache it. 
@@ -589,16 +626,22 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         if pipe is not None:
             pipe.watch(_count_hash)
             first_dict = pipe.zrangebyscore(
-                min="-inf", max="+inf", start=0, num=1, withscores=True
+                name=_count_hash,
+                start=0, num=1,
+                min="+inf", max="-inf", 
+                withscores=True
             )
         else:
             first_dict = self.connection.zrangebyscore(
-                min="-inf", max="+inf", start=0, num=1, withscores=True
+                name=_count_hash,
+                start=0, num=1,
+                min="+inf", max="-inf",
+                withscores=True
             )
 
         if first_dict is None:
             return float(0.0)
 
-        if isinstance(first_dict, dict) and len(first_dict) > 0:
-            return float(first_dict.keys()[0])
+        if len(first_dict) > 0:
+            return float(first_dict[0][1])
         return float(0.0)

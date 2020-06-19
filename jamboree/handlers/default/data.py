@@ -5,17 +5,17 @@ import pandas as pd
 import ujson
 from loguru import logger
 
-from jamboree import Jamboree, JamboreeNew
+from jamboree import Jamboree
 from jamboree.handlers.abstracted.search import MetadataSearchHandler
 from jamboree.handlers.complex.meta import MetaHandler
-from jamboree.handlers.default.db import DBHandler
-from jamboree.handlers.default.time import TimeHandler
-from jamboree.handlers.processors import DataProcessorsAbstract, DynamicResample
+from jamboree.handlers.default import Access, DBHandler, TimeHandler
+from jamboree.handlers.processors import (DataProcessorsAbstract,
+                                          DynamicResample)
 from jamboree.utils import omit
 from jamboree.utils.support.search import querying
 
 
-class DataHandler(DBHandler):
+class DataHandler(Access):
     """ 
         # DATA HANDLER
         ---
@@ -85,20 +85,20 @@ class DataHandler(DBHandler):
     @property
     def metadata(self):
         self._meta.processor = self.processor
-        self._meta["name"] = self["name"]
-        self._meta["category"] = self["category"]
-        self._meta["subcategories"] = self["subcategories"]
+        self._meta["name"] = self.name
+        self._meta["category"] = self.category
+        self._meta["subcategories"] = self.subcategories
         self._meta["metatype"] = self.entity
-        self._meta["submetatype"] = self["submetatype"]
-        self._meta["abbreviation"] = self["abbreviation"]
+        self._meta["submetatype"] = self.submetatype
+        self._meta["abbreviation"] = self.abbreviation
         return self._meta
 
     @property
     def search(self):
         self._metasearch.reset()
-        self._metasearch["category"] = querying.text.exact(self["category"])
+        self._metasearch["category"] = querying.text.exact(self.category)
         self._metasearch["metatype"] = querying.text.exact(self.entity)
-        self._metasearch["submetatype"] = querying.text.exact(self["submetatype"])
+        self._metasearch["submetatype"] = querying.text.exact(self.submetatype)
 
         self._metasearch.processor = self.processor
         return self._metasearch
@@ -155,6 +155,15 @@ class DataHandler(DBHandler):
         head = self.time.head
         tail = self.time.tail
         values = self.in_between(tail, head, ar="relative")
+        frame = pd.DataFrame(values)
+        frame = self._timestamp_resample_and_drop(frame)
+        return frame
+    
+
+    def dataframe_all(self):
+        """ Get a dataframe between a head and tail. Resample according to our settings"""
+
+        values = self.query_all()
         frame = pd.DataFrame(values)
         frame = self._timestamp_resample_and_drop(frame)
         return frame
@@ -358,8 +367,18 @@ if __name__ == "__main__":
     data_hander.time.change_lookback(microseconds=0, weeks=4, hours=0)
 
     while data_hander.is_next:
-        logger.debug(data_hander.time.head)
-        # logger.info(data_hander.closest_peakback_by(2))
-        # logger.error(data_hander.closest_head())
-        # logger.info(data_hander.dataframe_from_dynamic_peak())
+
+        logger.success(data_hander.name)
+        logger.warning(data_hander.category)
+        logger.error(data_hander.subcategories)
+        logger.debug(data_hander.abbreviation)
+        logger.success(data_hander.submetatype)
+        
+        print()
+        print()
+        logger.success(data_hander.time.head)
+        logger.info(data_hander.time.head)
+        logger.success(data_hander.time.head)
+        print()
+        print()
         data_hander.time.step()

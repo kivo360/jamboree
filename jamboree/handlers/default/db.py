@@ -262,13 +262,13 @@ class DBHandler(BaseHandler):
         items = self.processor.event.get_all(query)
         return items
 
-    def get_minimum_time(self, query:dict, alt:Dict[AnyStr, Any]={}):
+    def get_minimum_time(self, alt:Dict[AnyStr, Any]={}):
         self.check()
         _query = self.setup_query(alt)
         _time = self.processor.event.min_time(_query)
         return _time
 
-    def get_maximum_time(self, query:dict, alt:Dict[AnyStr, Any]={}):
+    def get_maximum_time(self, alt:Dict[AnyStr, Any]={}):
         self.check()
         _query = self.setup_query(alt)
         _time = self.processor.event.max_time(_query)

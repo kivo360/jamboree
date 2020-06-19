@@ -5,11 +5,11 @@ from typing import Optional
 import maya
 from jamboree import Jamboree
 from jamboree.handlers.abstracted.search import MetadataSearchHandler
-from jamboree.handlers.default import DBHandler
+from jamboree.handlers.default import DBHandler, Access
 from loguru import logger
 
 
-class MetaHandler(DBHandler):
+class MetaHandler(Access):
     """ 
         # MetaDataHandler
         --- 
@@ -51,8 +51,6 @@ class MetaHandler(DBHandler):
                 - Social interaction location data
                 - Login, logout location data
             - Creating something flexible for this would probably be a good idea. 
-        
-
     """
     def __init__(self):
         super().__init__()
@@ -72,8 +70,8 @@ class MetaHandler(DBHandler):
 
     @property
     def search(self):
-        metatype = self['metatype']
-        submetatype = self['submetatype']
+        metatype = self.metatype
+        submetatype = self.submetatype
         self._search.entity = self.entity
         self._search['metatype'] = {
             "type": "TEXT",
@@ -91,11 +89,11 @@ class MetaHandler(DBHandler):
                 "term": submetatype
             }
         }
-        self._search['name'] = self['name']
-        self._search['category'] = self['category']
-        self._search['subcategories'] = self['subcategories']
-        self._search['abbreviation'] = self['abbreviation']
-        self._search.processor = self.processor
+        self._search['name']            = self.name
+        self._search['category']        = self.category
+        self._search['subcategories']   = self.subcategories
+        self._search['abbreviation']    = self.abbreviation
+        self._search.processor          = self.processor
         return self._search
 
     def reset(self):

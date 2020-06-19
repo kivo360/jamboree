@@ -350,7 +350,9 @@ if __name__ == "__main__":
     timehandler["episode"] = eid
     timehandler["live"] = False
     timehandler.reset()
-
+    
     timehandler.head = maya.MayaDT(timehandler.head).subtract(weeks=20, days=9)._epoch
+    timehandler.change_stepsize(microseconds=0, days=1, hours=0)
     for _ in range(100):
-        logger.warning(timehandler.head)
+        logger.warning(maya.MayaDT(timehandler.head))
+        timehandler.step()
