@@ -91,7 +91,7 @@ class BacktestDBHandlerWithAccess(Access):
 
         A way to load in time and metadata information into classes that already use DB handler. 
         
-        If we're using blobhandler use object below
+        If we're using blobhandler use object below.
         
 
     """
