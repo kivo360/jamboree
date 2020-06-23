@@ -377,6 +377,4 @@ if __name__ == "__main__":
         logger.success(data_hander.time.head)
         logger.info(data_hander.time.head)
         logger.success(data_hander.time.head)
-        print()
-        print()
         data_hander.time.step()

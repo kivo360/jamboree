@@ -3,9 +3,9 @@
 
 ![Logo](docs/imgs/jamboree-long-new.png)
 
-**Jamboree is still in Alpha, meaning it should not be used in production systems yet, and it may contain bugs.**
+**`Jamboree` is extremely early, meaning it should be used with caution. There are plans to improve the system and many components are subject to change. If you look at the improvement plans linked at the bottom you'll be able to see it.**
 
-The goal of jamboree is to have an Event Sourcing Library that stores all prior states of an item located by query key. The purpose of it is to run extremely fast event sourcing for financial transactions from your computer to a large cluster of servers using the exact same code.
+The goal of `jamboree` is to have an Event Sourcing Library that stores all prior states of an item located by query key. The purpose of it is to run extremely fast event sourcing for financial transactions from your computer to a large cluster of servers using the exact same code.
 
 ## Install
 
@@ -25,29 +25,32 @@ $ docker run \
     -v /home/{PUTNAMEHERE}/data:/data \
     redislabs/redismod \
     --dir /data
+```
 
+**The output should look like the following.**
 
-    1:C 24 Apr 2019 21:46:40.382 # oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
-    ...
-    1:M 24 Apr 2019 21:46:40.474 * Module 'ai' loaded from /usr/lib/redis/modules/redisai.so
-    1:M 24 Apr 2019 21:46:40.474 * <ft> RediSearch version 1.4.7 (Git=)
-    1:M 24 Apr 2019 21:46:40.474 * <ft> concurrency: ON, gc: ON, prefix min length: 2, prefix max expansions: 200, query timeout (ms): 500, timeout policy: return, cursor read size: 1000, cursor max idle (ms): 300000, max doctable size: 1000000, search pool size: 20, index pool size: 8, 
-    1:M 24 Apr 2019 21:46:40.475 * <ft> Initialized thread pool!
-    1:M 24 Apr 2019 21:46:40.475 * Module 'ft' loaded from /usr/lib/redis/modules/redisearch.so
-    1:M 24 Apr 2019 21:46:40.476 * <graph> Thread pool created, using 8 threads.
-    1:M 24 Apr 2019 21:46:40.476 * Module 'graph' loaded from /usr/lib/redis/modules/redisgraph.so
-    loaded default MAX_SAMPLE_PER_CHUNK policy: 360 
-    1:M 24 Apr 2019 21:46:40.476 * Module 'timeseries' loaded from /usr/lib/redis/modules/redistimeseries.so
-    1:M 24 Apr 2019 21:46:40.476 # <ReJSON> JSON data type for Redis v1.0.4 [encver 0]
-    1:M 24 Apr 2019 21:46:40.476 * Module 'ReJSON' loaded from /usr/lib/redis/modules/rejson.so
-    1:M 24 Apr 2019 21:46:40.476 * Module 'bf' loaded from /usr/lib/redis/modules/rebloom.so
-    1:M 24 Apr 2019 21:46:40.477 * <rg> RedisGears version 0.2.1, git_sha=fb97ad757eb7238259de47035bdd582735b5c81b
-    1:M 24 Apr 2019 21:46:40.477 * <rg> PythonHomeDir:/usr/lib/redis/modules/deps/cpython/
-    1:M 24 Apr 2019 21:46:40.477 * <rg> MaxExecutions:1000
-    1:M 24 Apr 2019 21:46:40.477 * <rg> RedisAI api loaded successfully.
-    1:M 24 Apr 2019 21:46:40.477 # <rg> RediSearch api loaded successfully.
-    1:M 24 Apr 2019 21:46:40.521 * Module 'rg' loaded from /usr/lib/redis/modules/redisgears.so
-    1:M 24 Apr 2019 21:46:40.521 * Ready to accept connections
+```bash
+1:C 24 Apr 2019 21:46:40.382 # oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
+...
+1:M 24 Apr 2019 21:46:40.474 * Module 'ai' loaded from /usr/lib/redis/modules/redisai.so
+1:M 24 Apr 2019 21:46:40.474 * <ft> RediSearch version 1.4.7 (Git=)
+1:M 24 Apr 2019 21:46:40.474 * <ft> concurrency: ON, gc: ON, prefix min length: 2, prefix max expansions: 200, query timeout (ms): 500, timeout policy: return, cursor read size: 1000, cursor max idle (ms): 300000, max doctable size: 1000000, search pool size: 20, index pool size: 8, 
+1:M 24 Apr 2019 21:46:40.475 * <ft> Initialized thread pool!
+1:M 24 Apr 2019 21:46:40.475 * Module 'ft' loaded from /usr/lib/redis/modules/redisearch.so
+1:M 24 Apr 2019 21:46:40.476 * <graph> Thread pool created, using 8 threads.
+1:M 24 Apr 2019 21:46:40.476 * Module 'graph' loaded from /usr/lib/redis/modules/redisgraph.so
+loaded default MAX_SAMPLE_PER_CHUNK policy: 360 
+1:M 24 Apr 2019 21:46:40.476 * Module 'timeseries' loaded from /usr/lib/redis/modules/redistimeseries.so
+1:M 24 Apr 2019 21:46:40.476 # <ReJSON> JSON data type for Redis v1.0.4 [encver 0]
+1:M 24 Apr 2019 21:46:40.476 * Module 'ReJSON' loaded from /usr/lib/redis/modules/rejson.so
+1:M 24 Apr 2019 21:46:40.476 * Module 'bf' loaded from /usr/lib/redis/modules/rebloom.so
+1:M 24 Apr 2019 21:46:40.477 * <rg> RedisGears version 0.2.1, git_sha=fb97ad757eb7238259de47035bdd582735b5c81b
+1:M 24 Apr 2019 21:46:40.477 * <rg> PythonHomeDir:/usr/lib/redis/modules/deps/cpython/
+1:M 24 Apr 2019 21:46:40.477 * <rg> MaxExecutions:1000
+1:M 24 Apr 2019 21:46:40.477 * <rg> RedisAI api loaded successfully.
+1:M 24 Apr 2019 21:46:40.477 # <rg> RediSearch api loaded successfully.
+1:M 24 Apr 2019 21:46:40.521 * Module 'rg' loaded from /usr/lib/redis/modules/redisgears.so
+1:M 24 Apr 2019 21:46:40.521 * Ready to accept connections
 ```
 
 To run it in the background and let it start when the computer does
@@ -86,9 +89,6 @@ The idea is straightforward:
 2. After we create the Handler object, and set the limit (max number of records we want to look at), we start adding records until we stop. At the end, we get the amount of time it took to push the records.
     * Periodically, we do a small calculation to older information prior to adding a record.
 
-<!-- If you run the code in instrument exchange, you'll see that 5000 adds to both MongoDB and Redis takes a total of **2.1 seconds** on a single core! For C++ nerds that's nothing, though for the usual developer that's looking to develop an infrastucture, that's fast enough. 2000 adds per second per core, with also possible horizontal scalability is amazing. One can create server API code around that and create systems that can handle billions of interactions a day with very little development overhead.  -->
-
-
 ## Creating a Handler
 
 ```py
@@ -110,7 +110,7 @@ class SampleEnvHandler(DBHandler):
         return self._limit
 
     @limit.setter
-    def limit(self, limit):
+    def limit(self, limit):not be used in production systems yet, and it may contain bugs
         self._limit = limit
 
     @property

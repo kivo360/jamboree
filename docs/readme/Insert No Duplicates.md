@@ -4,26 +4,6 @@ Here we test inserting data without duplicates. Afterwards we'll test for missin
 
 
 ```python
-%pwd
-```
-
-
-
-
-    '/home/skywalker/PycharmProjects/jamboree/test/notebooks'
-
-
-
-
-```python
-%cd ../..
-```
-
-    /home/skywalker/PycharmProjects/jamboree
-
-
-
-```python
 from jamboree import Jamboree
 import pandas as pd
 import datetime
