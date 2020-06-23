@@ -187,7 +187,6 @@ class TimeHandler(DBHandler):
         params = self.looks
         self.save(params, alt=alt)
 
-
     def count_stepsize(self) -> int:
         alt = {"detail": "stepsize"}
         lookback_count = self.count(alt=alt)
@@ -202,6 +201,7 @@ class TimeHandler(DBHandler):
         """ Save monitored assets """
         alt = {"detail": "stepsize"}
         self.save(self.steps, alt=alt)
+
     def load_lookback(self):
         count = self.count_lookback()
         if count > 0:
@@ -350,7 +350,7 @@ if __name__ == "__main__":
     timehandler["episode"] = eid
     timehandler["live"] = False
     timehandler.reset()
-    
+
     timehandler.head = maya.MayaDT(timehandler.head).subtract(weeks=20, days=9)._epoch
     timehandler.change_stepsize(microseconds=0, days=1, hours=0)
     for _ in range(100):

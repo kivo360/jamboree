@@ -1,4 +1,4 @@
-from copy import Error, copy
+from copy import copy
 import orjson
 import ujson
 from typing import List, Optional

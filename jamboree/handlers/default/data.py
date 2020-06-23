@@ -374,8 +374,6 @@ if __name__ == "__main__":
         logger.debug(data_hander.abbreviation)
         logger.success(data_hander.submetatype)
         
-        print()
-        print()
         logger.success(data_hander.time.head)
         logger.info(data_hander.time.head)
         logger.success(data_hander.time.head)

@@ -1,122 +1,75 @@
-# Jamboree: Have a Fast Event-Source System Made with MongoDB, Redis and Love.
+# Jamboree: A Fast General Data Engineering Library
+ .
 
-![Logo](docs/imgs/jamboree_long.png)
+![Logo](docs/imgs/jamboree-long-new.png)
 
 **Jamboree is still in Alpha, meaning it should not be used in production systems yet, and it may contain bugs.**
 
-
 The goal of jamboree is to have an Event Sourcing Library that stores all prior states of an item located by query key. The purpose of it is to run extremely fast event sourcing for financial transactions from your computer to a large cluster of servers using the exact same code.
-
-Under the hood, the library uses other libraries to like `arctic`, `pebble`, `redis` and `mongo`. All of these combined help create concurrent transaction.
 
 ## Install
 
-The library requires `mongodb` and `redis` to operate.
+The library requires and `redis` to operate for the time being.
 
-```
+```bash
 pip install jamboree
 ```
 
-
-## Installing Mongodb
-
-**Ubuntu Installation**
-
-```bash
-
-# Add MongoDB for the registry
-wget -qO - https://www.mongodb.org/static/pgp/server-4.2.asc | sudo apt-key add -
-sudo apt-get install gnupg
-wget -qO - https://www.mongodb.org/static/pgp/server-4.2.asc | sudo apt-key add -
-echo "deb [ arch=amd64 ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/4.2 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-4.2.list
-
-# Now install mongodb
-sudo apt-get update
-sudo apt-get install -y mongodb-org
-
-
-# Make sure other mongodb components are installed
-echo "mongodb-org hold" | sudo dpkg --set-selections
-echo "mongodb-org-server hold" | sudo dpkg --set-selections
-echo "mongodb-org-shell hold" | sudo dpkg --set-selections
-echo "mongodb-org-mongos hold" | sudo dpkg --set-selections
-echo "mongodb-org-tools hold" | sudo dpkg --set-selections
-
-# Actually run the service
-sudo service mongod start
-```
-
-
-
-```bash
-mongo
-```
-
-
-**Debian**
-
-```bash
-# Add MongoDB for the registry
-wget -qO - https://www.mongodb.org/static/pgp/server-4.2.asc | sudo apt-key add -
-sudo apt-get install gnupg
-wget -qO - https://www.mongodb.org/static/pgp/server-4.2.asc | sudo apt-key add -
-echo "deb http://repo.mongodb.org/apt/debian buster/mongodb-org/4.2 main" | sudo tee /etc/apt/sources.list.d/mongodb-org-4.2.list
-
-
-# Now install mongodb
-sudo apt-get update
-sudo apt-get install -y mongodb-org
-
-# Make sure other mongodb components are installed
-echo "mongodb-org hold" | sudo dpkg --set-selections
-echo "mongodb-org-server hold" | sudo dpkg --set-selections
-echo "mongodb-org-shell hold" | sudo dpkg --set-selections
-echo "mongodb-org-mongos hold" | sudo dpkg --set-selections
-echo "mongodb-org-tools hold" | sudo dpkg --set-selections
-```
-
-
 ## Install Redis
 
-All of the redis installation instructions are [here](https://redis.io/topics/quickstart), but here's a TLDR:
-
-
-```bash
-# Download the installation script
-wget http://download.redis.io/redis-stable.tar.gz
-# exctract and enter the folder
-tar xvzf redis-stable.tar.gz
-cd redis-stable
-# Build redis to make it run
-make
-```
-
-**Run Server**
+All of the redis installation instructions are [here](https://redis.io/topics/quickstart). Though because the current module setup uses redisearch and will likely use many other modules in the future. Because installing modules is a bit more complex than necessary right now it's best to use docker:
 
 ```bash
-$ redis-server
-[28550] 01 Aug 19:29:28 # Warning: no config file specified, using the default config. In order to specify a config file use 'redis-server /path/to/redis.conf'
-[28550] 01 Aug 19:29:28 * Server started, Redis version 2.2.12
-[28550] 01 Aug 19:29:28 * The server is now ready to accept connections on port 6379
-... more logs ...
+$ docker run \
+    -p 6379:6379 \
+    -v /home/{PUTNAMEHERE}/data:/data \
+    redislabs/redismod \
+    --dir /data
 
+
+    1:C 24 Apr 2019 21:46:40.382 # oO0OoO0OoO0Oo Redis is starting oO0OoO0OoO0Oo
+    ...
+    1:M 24 Apr 2019 21:46:40.474 * Module 'ai' loaded from /usr/lib/redis/modules/redisai.so
+    1:M 24 Apr 2019 21:46:40.474 * <ft> RediSearch version 1.4.7 (Git=)
+    1:M 24 Apr 2019 21:46:40.474 * <ft> concurrency: ON, gc: ON, prefix min length: 2, prefix max expansions: 200, query timeout (ms): 500, timeout policy: return, cursor read size: 1000, cursor max idle (ms): 300000, max doctable size: 1000000, search pool size: 20, index pool size: 8, 
+    1:M 24 Apr 2019 21:46:40.475 * <ft> Initialized thread pool!
+    1:M 24 Apr 2019 21:46:40.475 * Module 'ft' loaded from /usr/lib/redis/modules/redisearch.so
+    1:M 24 Apr 2019 21:46:40.476 * <graph> Thread pool created, using 8 threads.
+    1:M 24 Apr 2019 21:46:40.476 * Module 'graph' loaded from /usr/lib/redis/modules/redisgraph.so
+    loaded default MAX_SAMPLE_PER_CHUNK policy: 360 
+    1:M 24 Apr 2019 21:46:40.476 * Module 'timeseries' loaded from /usr/lib/redis/modules/redistimeseries.so
+    1:M 24 Apr 2019 21:46:40.476 # <ReJSON> JSON data type for Redis v1.0.4 [encver 0]
+    1:M 24 Apr 2019 21:46:40.476 * Module 'ReJSON' loaded from /usr/lib/redis/modules/rejson.so
+    1:M 24 Apr 2019 21:46:40.476 * Module 'bf' loaded from /usr/lib/redis/modules/rebloom.so
+    1:M 24 Apr 2019 21:46:40.477 * <rg> RedisGears version 0.2.1, git_sha=fb97ad757eb7238259de47035bdd582735b5c81b
+    1:M 24 Apr 2019 21:46:40.477 * <rg> PythonHomeDir:/usr/lib/redis/modules/deps/cpython/
+    1:M 24 Apr 2019 21:46:40.477 * <rg> MaxExecutions:1000
+    1:M 24 Apr 2019 21:46:40.477 * <rg> RedisAI api loaded successfully.
+    1:M 24 Apr 2019 21:46:40.477 # <rg> RediSearch api loaded successfully.
+    1:M 24 Apr 2019 21:46:40.521 * Module 'rg' loaded from /usr/lib/redis/modules/redisgears.so
+    1:M 24 Apr 2019 21:46:40.521 * Ready to accept connections
 ```
 
+To run it in the background and let it start when the computer does
 
+```bash
+$ docker run \
+    -p 6379:6379 -d \
+    --restart=always \
+    -v /home/{PUTNAMEHERE}/data:/data \
+    redislabs/redismod \
+    --dir /data
+```
 
-
-
-## Wait, What is Event Sourcing?
+## What is State Carrying?
 
 Event Sourcing is a round about way of saying tracking information through their interactions over time more so than exact states. It helps us construct a story of all things that have happened in a system over time. It looks like the image below.
 
 ![Event Sourcing](docs/imgs/event-sourcing_long.png)
 
+State carrying is dragging the current state along over time.
 
 The ultimate result is that you'd have tracability in your system. This is great when you're trying to see how interactions happen through time.
-
-
-
 
 ## How The Library Works
 
@@ -125,14 +78,15 @@ The Jamboree Library Is Split In Two Parts:
 1. Jamboree Event Sourcing
 2. Object Handler
 
-The `Jamboree` object is rather simple. It only saves, reads, and deletes records in both `redis` and `mongodb`. Redis to give it fast read times, mongodb as backup to the data. `Handlers` have very explicit storage procedures that interact with the Jamboree object. A good example is the code below. It is from the ![examples/instrument_exchange.py](./examples/sample_env.py) directory. The idea is straightforward:
+The `Jamboree` object is rather simple. It only saves, reads, and deletes records in both `redis` and `mongodb`. Redis to give it fast read times, mongodb as backup to the data. `Handlers` have very explicit storage procedures that interact with the Jamboree object. A good example is the code below.
 
-1. We create a Jamboree object. The Jamboree object manages connections to the two databases. 
+The idea is straightforward:
+
+1. We create a `Jamboree` object. The Jamboree object manages connections to the two databases.
 2. After we create the Handler object, and set the limit (max number of records we want to look at), we start adding records until we stop. At the end, we get the amount of time it took to push the records.
     * Periodically, we do a small calculation to older information prior to adding a record.
 
-
-If you run the code in instrument exchange, you'll see that 5000 adds to both MongoDB and Redis takes a total of **2.1 seconds** on a single core! For C++ nerds that's nothing, though for the usual developer that's looking to develop an infrastucture, that's fast enough. 2000 adds per second per core, with also possible horizontal scalability is amazing. One can create server API code around that and create systems that can handle billions of interactions a day with very little development overhead. 
+<!-- If you run the code in instrument exchange, you'll see that 5000 adds to both MongoDB and Redis takes a total of **2.1 seconds** on a single core! For C++ nerds that's nothing, though for the usual developer that's looking to develop an infrastucture, that's fast enough. 2000 adds per second per core, with also possible horizontal scalability is amazing. One can create server API code around that and create systems that can handle billions of interactions a day with very little development overhead.  -->
 
 
 ## Creating a Handler
@@ -154,10 +108,10 @@ class SampleEnvHandler(DBHandler):
     @property
     def limit(self):
         return self._limit
-    
+
     @limit.setter
     def limit(self, limit):
-        self._limit = limit 
+        self._limit = limit
 
     @property
     def balance(self):
@@ -168,17 +122,17 @@ class SampleEnvHandler(DBHandler):
     def transactions(self)->vaex.dataframe:
         """ Get the last 100 transactions """
         many_records = self.many(self.limit)
-        
+
         if isinstance(many_records, dict):
             frame = pd.DataFrame(many_records)
             transactions_frame = vaex.from_pandas(frame)
             return transactions_frame.sort('timestamp', ascending=False)
-        
+
         if len(many_records) > 0:
             frame = pd.DataFrame(many_records)
             transactions_frame = vaex.from_pandas(frame)
             return transactions_frame.sort('timestamp', ascending=False)
-        
+
         return vaex.from_pandas(pd.DataFrame())
 
     def save_update_recent(self, data:dict):
@@ -213,7 +167,5 @@ with timecontext():
         if flip(0.05):
             sample_env_handler.save_update_recent({"value": v1})
     
-    print(sample_env_handler.last())
-    print(sample_env_handler.transactions)
 ```
 

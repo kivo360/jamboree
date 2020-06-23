@@ -22,7 +22,6 @@ from jamboree.utils.support.search import (InsertBuilder, QueryBuilder,
                                            name_match, to_field, to_str)
 from jamboree.utils.support.search.assistance import Keystore
 
-from cytoolz import unique
 
 logger.disable(__name__)
 """

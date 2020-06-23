@@ -20,7 +20,7 @@ class BaseHandler(object, metaclass=ABCMeta):
     def _bulk_save(self, query: dict, data: list):
         raise NotImplementedError
 
-    def _get_many(self):
+    def _get_many(self, limit: int, ar: str, alt={}):
         raise NotImplementedError
 
     def last(self):

@@ -1,32 +1,29 @@
-import json
 import pprint
-import time
 import uuid
-from copy import deepcopy
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-import crayons as cy
+
 import maya
-import pandas_datareader.data as web
 import ujson
 from loguru import logger
 
 from jamboree import JamboreeNew
 from jamboree.handlers.abstracted.search import MetadataSearchHandler
 from jamboree.handlers.complex.meta import MetaHandler
-from jamboree.handlers.default import DataHandler, DBHandler, TimeHandler, Access
-from jamboree.middleware.processors import DataProcessorsAbstract, DynamicResample
+from jamboree.handlers.default import (Access, DataHandler,
+                                       TimeHandler)
+from jamboree.middleware.processors import (DataProcessorsAbstract,
+                                            DynamicResample)
 from jamboree.utils.context import example_space
 from jamboree.utils.core import consistent_hash, consistent_unhash
 from jamboree.utils.support.search import querying
 
 
-
 """
-    NOTE: Will probably inherit this to fix it in private.
-    This is dog shit!!!!
+    NOTE: Will probably inherit this to fix it in private. THIS NEEDS TO BE FIXED
     
-    A lot of this will be replaced using a task graphs (to manage relationships), redisearch aggregations and pipelines (crafting a tree of interactions)
+    A lot of this will be replaced using a task graphs (to manage relationships), 
+    redisearch aggregations and pipelines (crafting a tree of interactions)
 
 """
 
@@ -77,8 +74,7 @@ class MultiDataManagement(Access):
             DataHandler
         ] = []  # Store the dataset objects we can access at once without redeclaring
         self.dup_check_list = []  # use to check for duplicates in dataset
-        
-        
+
         self._meta = MetaHandler()
         self._metasearch = MetadataSearchHandler()
         self.metaid: str = ""
@@ -103,7 +99,7 @@ class MultiDataManagement(Access):
         # self["metatype"] = self.entity
         # self["category"] = "universe"
         # self["submetatype"] = "price_bag"
-        
+
         self.is_event = False
 
     def init_required(self, **kwargs):
@@ -189,14 +185,13 @@ class MultiDataManagement(Access):
         is_live_list: List[bool] = []
         for ds in self.datasets:
             ds.processor = processor
-            ds.episode   = self.episode
-            ds.live      = self.live
+            ds.episode = self.episode
+            ds.live = self.live
             ds.is_robust = self.is_robust
             is_live_list.append(ds.is_next)
 
         # Use all to determine if the values are falsey or not
         return all(is_live_list)
-
 
     @property
     def source_ids(self) -> List[str]:
@@ -209,7 +204,6 @@ class MultiDataManagement(Access):
         List[str]
             List of hex ids
         """
-
 
         _source_ids = []
         for source in self.sources:
@@ -295,17 +289,16 @@ class MultiDataManagement(Access):
         if not_zero:
             self.add_dataset_handler()
         return not_zero
-    
 
-    def _get_source_id(self, source: dict) -> bool:
+    def _get_source_id(self, source: dict) -> Optional[str]:
         """ Check to see if the data exist when putting list of datahandlers together"""
-        self.datasethandler.event               = self.event
-        self.datasethandler.processor           = self.processor
-        self.datasethandler["name"]             = source["name"]
-        self.datasethandler["category"]         = source["category"]
-        self.datasethandler["subcategories"]    = source["subcategories"]
-        self.datasethandler["submetatype"]      = source["submetatype"]
-        self.datasethandler["abbreviation"]     = source["abbreviation"]
+        self.datasethandler.event = self.event
+        self.datasethandler.processor = self.processor
+        self.datasethandler["name"] = source["name"]
+        self.datasethandler["category"] = source["category"]
+        self.datasethandler["subcategories"] = source["subcategories"]
+        self.datasethandler["submetatype"] = source["submetatype"]
+        self.datasethandler["abbreviation"] = source["abbreviation"]
         count = self.datasethandler.count()
         not_zero = count != 0
 
@@ -399,9 +392,6 @@ class MultiDataManagement(Access):
         latest_list = self.last()
         return latest_list
 
-
-    
-
     def _load_dataset_list(self):
         self.check()
         if self.count_dataset_list() > 0:
@@ -448,7 +438,6 @@ class MultiDataManagement(Access):
         """ Remove this time step """
         self.sync()
         return data_set
-    
 
     def sync(self):
         """ Gets all of the datahandlers and synchronize their time object """
@@ -458,9 +447,8 @@ class MultiDataManagement(Access):
                 data.live = self.live
                 data.episode = self.episode
                 data.time = self.time
-    
 
-    def pick(self, _id:str):
+    def pick(self, _id: str):
         # Will probably make this kind of interface common. Get all information by meta_id
         """Pick
 
@@ -474,18 +462,17 @@ class MultiDataManagement(Access):
         item = self.search.FindById(_id)
         if item is None:
             return None
-        _multi                  = MultiDataManagement()
-        _multi.processor        = self.processor
-        _multi['name']          = item['name']
-        _multi['abbreviation']  = item['abbreviation']
-        _multi['submetatype']   = item['submetatype']
-        _multi['category']      = item['category']
-        _multi['metatype']      = item['metatype']
-        _multi['subcategories'] = (item['subcategories']).to_dict()
+        _multi = MultiDataManagement()
+        _multi.processor = self.processor
+        _multi["name"] = item["name"]
+        _multi["abbreviation"] = item["abbreviation"]
+        _multi["submetatype"] = item["submetatype"]
+        _multi["category"] = item["category"]
+        _multi["metatype"] = item["metatype"]
+        _multi["subcategories"] = (item["subcategories"]).to_dict()
         _multi.reset()
         return _multi
 
-    
 
 if __name__ == "__main__":
     with example_space("Multi-Data-Management") as example:
@@ -532,7 +519,6 @@ if __name__ == "__main__":
         }
 
         full_set = [dset1, dset2, dset3, dset4]
-        pprint.pprint(multi_data.sources)
         multi_data.add_multiple_data_sources(full_set)
         # Check to make sure we aren't adding any dummy sources
         multi_data.time.head = maya.now().subtract(weeks=200, hours=14)._epoch
