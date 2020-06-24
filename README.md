@@ -5,7 +5,7 @@
 
 **`Jamboree` is extremely early, meaning it should be used with caution. There are plans to improve the system and many components are subject to change. If you look at the improvement plans linked at the bottom you'll be able to see it.**
 
-The goal of `jamboree` is to have an Event Sourcing Library that stores all prior states of an item located by query key. The purpose of it is to run extremely fast event sourcing for financial transactions from your computer to a large cluster of servers using the exact same code.
+The goal of `jamboree` was to manage the complexities of data engineering.
 
 ## Install
 
@@ -64,9 +64,9 @@ $ docker run \
     --dir /data
 ```
 
-## What is State Carrying?
+## What is Event State Carrying?
 
-Event Sourcing is a round about way of saying tracking information through their interactions over time more so than exact states. It helps us construct a story of all things that have happened in a system over time. It looks like the image below.
+State Carrying is a round about way of saying tracking information through their interactions oversp time more so than exact states. It helps us construct a story of all things that have happened in a system over time. It looks like the image below.
 
 ![Event Sourcing](docs/imgs/event-sourcing_long.png)
 
@@ -110,7 +110,7 @@ class SampleEnvHandler(DBHandler):
         return self._limit
 
     @limit.setter
-    def limit(self, limit):not be used in production systems yet, and it may contain bugs
+    def limit(self, limit):
         self._limit = limit
 
     @property
