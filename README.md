@@ -85,7 +85,7 @@ The `Jamboree` object is rather simple. It only saves, reads, and deletes record
 
 The idea is straightforward:
 
-1. We create a `Jamboree` object. The Jamboree object manages connections to the two databases.
+1. We create a `Jamboree` object. The Jamboree object manages connections to databases at a high speed and low latency.
 2. After we create the Handler object, and set the limit (max number of records we want to look at), we start adding records until we stop. At the end, we get the amount of time it took to push the records.
     * Periodically, we do a small calculation to older information prior to adding a record.
 
@@ -166,6 +166,10 @@ with timecontext():
         sample_env_handler.save({"value": v1})
         if flip(0.05):
             sample_env_handler.save_update_recent({"value": v1})
-    
 ```
 
+## Improvement Plans
+
+Jamboree currently has a list of improvements that
+
+https://trello.com/b/9vwpc5C6
