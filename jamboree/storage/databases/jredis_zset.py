@@ -68,7 +68,7 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         serialized = None
         if is_serialized:
             # Don't serialize the json
-            serialized = orjson.dumps(data)
+            serialized = orjson.dumps(data, option=orjson.OPT_SERIALIZE_NUMPY)
         else:
             serialized = data
         with self.connection.pipeline() as pipe:
@@ -131,7 +131,7 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
     @logger.catch
     def _save(self, _hash: str, data: dict, timing: dict):
         """ Appends an event to the stack. """
-        serialized = orjson.dumps(data)
+        serialized = orjson.dumps(data, option=orjson.OPT_SERIALIZE_NUMPY)
         rlock = f"{_hash}:lock"
         relative_time_key = f"{_hash}:rlist"
         absolute_time_key = f"{_hash}:alist"
@@ -196,7 +196,7 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         rlock = f"{_hash}:lock"
         relative_time_key = f"{_hash}:rlist"
         absolute_time_key = f"{_hash}:alist"
-        deletion_key = orjson.dumps(details)
+        deletion_key = orjson.dumps(details, option=orjson.OPT_SERIALIZE_NUMPY)
         with self.connection.lock(rlock):
             self.connection.zrem(relative_time_key, deletion_key)
             self.connection.zrem(absolute_time_key, deletion_key)
@@ -376,11 +376,8 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         combined = self.helpers.combined_abs_rel(keys, abs_rel=abs_rel)
         return combined
 
-
     def query_all_between(
-        self,
-        _query: dict,
-        abs_rel: str = "absolute",
+        self, _query: dict, abs_rel: str = "absolute",
     ):
         if not self.helpers.validate_query(_query) or abs_rel not in [
             "absolute",
@@ -511,7 +508,9 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         _hash_placeholder = f"{_hash}:{phindex}"
         _hash_del = f"{_hash}:{delindex}"
 
-        serialized_mongo = [orjson.dumps(mon) for mon in mongo_data]
+        serialized_mongo = [
+            orjson.dumps(mon, option=orjson.OPT_SERIALIZE_NUMPY) for mon in mongo_data
+        ]
         # rlock = f"{_hash}:lock"
         with self.connection.pipeline() as pipe:
             while True:
@@ -563,18 +562,22 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
         if pipe is not None:
             pipe.watch(_count_hash)
             count = pipe.zrangebyscore(
-                start=0, num=1,
+                start=0,
+                num=1,
                 name=_count_hash,
-                min="-inf", max="+inf", 
-                withscores=True
+                min="-inf",
+                max="+inf",
+                withscores=True,
             )
 
         else:
             count = self.connection.zrangebyscore(
                 name=_count_hash,
-                start=0, num=1,
-                min="-inf", max="+inf", 
-                withscores=True
+                start=0,
+                num=1,
+                min="-inf",
+                max="+inf",
+                withscores=True,
             )
         if count is None:
             return float(0.0)
@@ -583,11 +586,10 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
             return float(count[0][1])
         return float(0.0)
 
-
     # def max_score(self, _hash: str, pipe: Optional[Pipeline] = None):
     #     """max_score Get Max Score
 
-    #         Get the max score given a key. We get the maximum score and cache it. 
+    #         Get the max score given a key. We get the maximum score and cache it.
     #         If we change any information we can swap the cache out dynamically to increase access speed.
     #     """
     #     _count_hash = f"{_hash}:rlist"
@@ -596,7 +598,7 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
     #         count = pipe.zrangebyscore(
     #             start=0, num=1,
     #             name=_count_hash,
-    #             min="-inf", max="+inf", 
+    #             min="-inf", max="+inf",
     #             withscores=True
     #         )
 
@@ -604,7 +606,7 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
     #         count = self.connection.zrangebyscore(
     #             name=_count_hash,
     #             start=0, num=1,
-    #             min="-inf", max="+inf", 
+    #             min="-inf", max="+inf",
     #             withscores=True
     #         )
     #     if count is None:
@@ -627,16 +629,20 @@ class RedisDatabaseZSetsConnection(DatabaseConnection):
             pipe.watch(_count_hash)
             first_dict = pipe.zrangebyscore(
                 name=_count_hash,
-                start=0, num=1,
-                min="+inf", max="-inf", 
-                withscores=True
+                start=0,
+                num=1,
+                min="+inf",
+                max="-inf",
+                withscores=True,
             )
         else:
             first_dict = self.connection.zrangebyscore(
                 name=_count_hash,
-                start=0, num=1,
-                min="+inf", max="-inf",
-                withscores=True
+                start=0,
+                num=1,
+                min="+inf",
+                max="-inf",
+                withscores=True,
             )
 
         if first_dict is None:
