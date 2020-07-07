@@ -104,7 +104,13 @@ class TimeHandler(DBHandler):
         return tail._epoch
 
     def change_lookback(
-        self, microseconds=1000, seconds=0, minutes=0, hours=10, days=0, weeks=0
+        self,
+        microseconds=1000,
+        seconds=0,
+        minutes=0,
+        hours=10,
+        days=0,
+        weeks=0
     ):
         self.load_lookback()
         if microseconds != 1000:
@@ -123,7 +129,13 @@ class TimeHandler(DBHandler):
         self.save_lookback()
 
     def change_stepsize(
-        self, microseconds=1000, seconds=0, minutes=0, hours=10, days=0, weeks=0
+        self,
+        microseconds=1000,
+        seconds=0,
+        minutes=0,
+        hours=10,
+        days=0,
+        weeks=0
     ):
         self.load_stepsize()
         if microseconds != 1000:
@@ -146,25 +158,33 @@ class TimeHandler(DBHandler):
     """
 
     def save_head(self):
-        alt = {"detail": "head"}
+        alt = {
+            "detail": "head"
+        }
         # head_data = {"time": self._head}
         self.set_single(self._head, alt=alt, is_serialized=False)
 
     def latest_head(self) -> dict:
-        alt = {"detail": "head"}
+        alt = {
+            "detail": "head"
+        }
         item = self.get_single(alt=alt, is_serialized=False)
         return item
 
     # def
 
     def count_headindex(self) -> int:
-        alt = {"detail": "headindex"}
+        alt = {
+            "detail": "headindex"
+        }
         lookback_count = self.count(alt=alt)
         return lookback_count
 
     def save_headindex(self):
         """ Save monitored assets """
-        alt = {"detail": "headindex"}
+        alt = {
+            "detail": "headindex"
+        }
         self.save({"message": "Head Index"}, alt=alt)
 
     """ 
@@ -172,34 +192,46 @@ class TimeHandler(DBHandler):
     """
 
     def count_lookback(self) -> int:
-        alt = {"detail": "lookback"}
+        alt = {
+            "detail": "lookback"
+        }
         lookback_count = self.count(alt=alt)
         return lookback_count
 
     def latest_lookback(self) -> dict:
-        alt = {"detail": "lookback"}
+        alt = {
+            "detail": "lookback"
+        }
         lookback = self.last(alt=alt)
         return lookback
 
     def save_lookback(self):
         """ Save monitored assets """
-        alt = {"detail": "lookback"}
+        alt = {
+            "detail": "lookback"
+        }
         params = self.looks
         self.save(params, alt=alt)
 
     def count_stepsize(self) -> int:
-        alt = {"detail": "stepsize"}
+        alt = {
+            "detail": "stepsize"
+        }
         lookback_count = self.count(alt=alt)
         return lookback_count
 
     def latest_stepsize(self) -> dict:
-        alt = {"detail": "stepsize"}
+        alt = {
+            "detail": "stepsize"
+        }
         lookback = self.last(alt=alt)
         return lookback
 
     def save_stepsize(self):
         """ Save monitored assets """
-        alt = {"detail": "stepsize"}
+        alt = {
+            "detail": "stepsize"
+        }
         self.save(self.steps, alt=alt)
 
     def load_lookback(self):
@@ -268,8 +300,29 @@ class TimeHandler(DBHandler):
         head = self.head
         step_params = self.stepsize_params
         lookahead_params = self.lookback_params
-        new_head = maya.MayaDT(head).add(**step_params).add(**lookahead_params)._epoch
+        new_head = maya.MayaDT(head).add(**step_params
+                                         ).add(**lookahead_params)._epoch
         return new_head
+
+    def peak_num(self, n: int = 1) -> float:
+        """ 
+            # Peak Num
+            ---
+            Peak n steps into the future. 
+
+            Parameters
+            ----------
+                n: {int} - The number of steps backwards. Used to get the information.
+        """
+        if n < 1:
+            raise ValueError("Number n needs to be greater than 1")
+        head = self.head
+        step_params = self.stepsize_params
+        current_position = maya.MayaDT(head)
+        for _ in range(n):
+            current_position = current_position.add(**step_params)
+        peak_position = current_position._epoch
+        return peak_position
 
     def peak_back(self) -> float:
         head = self.head
@@ -287,10 +340,8 @@ class TimeHandler(DBHandler):
         step_params = self.stepsize_params
         lookahead_params = self.lookback_params
         new_head = (
-            maya.MayaDT(head)
-            .subtract(**step_params)
-            .subtract(**lookahead_params)
-            ._epoch
+            maya.MayaDT(head).subtract(**step_params
+                                       ).subtract(**lookahead_params)._epoch
         )
         return new_head
 
@@ -351,7 +402,8 @@ if __name__ == "__main__":
     timehandler["live"] = False
     timehandler.reset()
 
-    timehandler.head = maya.MayaDT(timehandler.head).subtract(weeks=20, days=9)._epoch
+    timehandler.head = maya.MayaDT(timehandler.head
+                                   ).subtract(weeks=20, days=9)._epoch
     timehandler.change_stepsize(microseconds=0, days=1, hours=0)
     for _ in range(100):
         logger.warning(maya.MayaDT(timehandler.head))

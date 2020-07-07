@@ -1714,6 +1714,14 @@ python-versions = "*"
 version = "1.11.2"
 
 [[package]]
+category = "dev"
+description = "A formatter for Python code."
+name = "yapf"
+optional = false
+python-versions = "*"
+version = "0.30.0"
+
+[[package]]
 category = "main"
 description = "Yahoo! Finance market data downloader"
 name = "yfinance"
@@ -1757,7 +1765,7 @@ test = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 
 [metadata]
-content-hash = "208624230ae3dd642164e13261cb0c5f8c25990405ac790bc8613e1b8b566677"
+content-hash = "e1e90a8e185260cf8467973f83ad0e6d926a31937825873c1584f46fe66b35ae"
 python-versions = "^3.6.8"
 
 [metadata.files]
@@ -2748,6 +2756,10 @@ win32-setctime = [
 ]
 wrapt = [
     {file = "wrapt-1.11.2.tar.gz", hash = "sha256:565a021fd19419476b9362b05eeaa094178de64f8361e44468f9e9d7843901e1"},
+]
+yapf = [
+    {file = "yapf-0.30.0-py2.py3-none-any.whl", hash = "sha256:3abf61ba67cf603069710d30acbc88cfe565d907e16ad81429ae90ce9651e0c9"},
+    {file = "yapf-0.30.0.tar.gz", hash = "sha256:3000abee4c28daebad55da6c85f3cd07b8062ce48e2e9943c8da1b9667d48427"},
 ]
 yfinance = [
     {file = "yfinance-0.1.54.tar.gz", hash = "sha256:cee223cbd31e14955869f7978bcf83776d644345c7dea31ba5d41c309bfb0d3d"},

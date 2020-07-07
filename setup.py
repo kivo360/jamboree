@@ -43,10 +43,9 @@ class UploadCommand(Command):
         sys.exit()
 
 
-
 setup(
     name="jamboree",
-    version="0.9.5",
+    version="0.9.6",
     author="Kevin Hill",
     author_email="kah.kevin.hill@gmail.com",
     description="A multi-layer event sourcing and general data library. SQL, Search, Event Sourcing, and File/Model storage combined into one.",
@@ -56,16 +55,16 @@ setup(
     install_requires=[
         "numpy",
         "scipy",
-        'maya',
+        "maya",
         "pandas-datareader",
         "json-tricks",
         "ujson",
-        'gym',
+        "gym",
         "orjson",
         "pebble",
         "cytoolz",
         "loguru",
-        'redisearch',
+        "redisearch",
         "lz4",
         "anycache",
         "hiredis",
@@ -76,7 +75,7 @@ setup(
         "sklearn",
         "crayons",
         "creme",
-        'pydantic',
+        "pydantic",
         "yfinance",
         "version_query",
         "pandas",
