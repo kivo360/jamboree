@@ -10,7 +10,6 @@ from typing import Any, Dict, Optional
 import ujson
 from addict import Dict as ADict
 
-from jamboree import JamboreeNew
 from jamboree.base.processors.abstracts import EventProcessor, Processor
 from jamboree.handlers.base import BaseFileHandler, BaseHandler
 from jamboree.utils.helper import Helpers
@@ -23,7 +22,6 @@ class BlobStorageHandler(BaseHandler):
         
         Currently uses zadd to work
     """
-
     def __init__(self):
         # print("DBHandler")
         self._entity = ""
@@ -34,11 +32,11 @@ class BlobStorageHandler(BaseHandler):
         self._is_event = True
         self._processor: Optional[Processor] = None
         self.event_proc: Optional[EventProcessor] = None
-        self.main_helper:Helpers = Helpers()
-        self.changed_since_command:bool = False
-        self.is_skip_check:bool = False
+        self.main_helper: Helpers = Helpers()
+        self.changed_since_command: bool = False
+        self.is_skip_check: bool = False
         self.call_params = {}
-        
+
     def __setitem__(self, key, value):
         if bool(self.required):
 
@@ -47,7 +45,7 @@ class BlobStorageHandler(BaseHandler):
                 return self._query
         self._data[key] = value
         self.changed_since_command = True
-        
+
         return self._data
 
     def __getitem__(self, key):
@@ -115,11 +113,8 @@ class BlobStorageHandler(BaseHandler):
             self._query = _query
 
     def check(self):
-        if (
-            (not bool(self._entity))
-            or (not bool(self._required))
-            or (not bool(self._query))
-        ):
+        if ((not bool(self._entity)) or (not bool(self._required))
+            or (not bool(self._query))):
             raise AttributeError(f"One of the key variables is missing.")
 
         for req in self._required.keys():
@@ -139,7 +134,9 @@ class BlobStorageHandler(BaseHandler):
         self.processor.storage.save(query, data, **current_settings.to_dict())
         self.changed_since_command = False
 
-    def save_version(self, data: dict, version: str, alt={}, is_overwrite=False):
+    def save_version(
+        self, data: dict, version: str, alt={}, is_overwrite=False
+    ):
         self.check()
         query = self.setup_query(alt)
         # Put settings here
@@ -205,7 +202,7 @@ class BlobStorageHandler(BaseHandler):
     def __enter__(self):
         self.check()
         self.is_skip_check = True
-        
+
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):

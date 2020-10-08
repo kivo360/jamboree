@@ -9,8 +9,9 @@ from jamboree import Jamboree
 from jamboree.handlers.abstracted.search import MetadataSearchHandler
 from jamboree.handlers.complex.meta import MetaHandler
 from jamboree.handlers.default import Access, DBHandler, TimeHandler
-from jamboree.handlers.processors import (DataProcessorsAbstract,
-                                          DynamicResample)
+from jamboree.handlers.processors import (
+    DataProcessorsAbstract, DynamicResample
+)
 from jamboree.utils import omit
 from jamboree.utils.support.search import querying
 
@@ -30,7 +31,6 @@ class DataHandler(Access):
         5. Adds autoresampling functionality.
 
     """
-
     def __init__(self):
         super().__init__()
         self.entity = "data"
@@ -49,7 +49,7 @@ class DataHandler(Access):
         self._episode = uuid.uuid4().hex
         self._is_live = False
         self._preprocessor: DataProcessorsAbstract = DynamicResample("data")
-        self.is_event = False  # use to make sure there's absolutely no duplicate data
+        self.is_event = False # use to make sure there's absolutely no duplicate data
         self.metaid = ""
         self["metatype"] = self.entity
 
@@ -121,7 +121,9 @@ class DataHandler(Access):
     def preprocessor(self, _preprocessor: DataProcessorsAbstract):
         self._preprocessor = _preprocessor
 
-    def _timestamp_resample_and_drop(self, frame: pd.DataFrame, resample_size="D"):
+    def _timestamp_resample_and_drop(
+        self, frame: pd.DataFrame, resample_size="D"
+    ):
         timestamps = pd.to_datetime(frame.time, unit="s")
         frame.set_index(timestamps, inplace=True)
         frame = frame.drop(
@@ -130,6 +132,7 @@ class DataHandler(Access):
         frame = frame.resample(resample_size).mean()
         frame = frame.fillna(method="ffill")
         return frame
+
     def store_time_df(self, dataframe: pd.DataFrame, is_bar=False):
         """ 
             Breaks a dataframe into parts then stores them into redis. 
@@ -146,7 +149,9 @@ class DataHandler(Access):
         """ Add information to the current dataset"""
         data_dict_list = [data_dict]
         if is_bar == True:
-            data_dict_list = self.main_helper.standardize_outputs(data_dict_list)
+            data_dict_list = self.main_helper.standardize_outputs(
+                data_dict_list
+            )
         self.save_many(data_dict_list)
 
     def dataframe_from_head(self):
@@ -158,7 +163,6 @@ class DataHandler(Access):
         frame = pd.DataFrame(values)
         frame = self._timestamp_resample_and_drop(frame)
         return frame
-    
 
     def dataframe_all(self):
         """ Get a dataframe between a head and tail. Resample according to our settings"""
@@ -199,11 +203,13 @@ class DataHandler(Access):
                 last.pop("category", None)
                 last.pop("subcategories", None)
                 last.pop("type", None)
+                last.pop("mtype", None)
                 return last
             return {}
         closest.pop("name", None)
         closest.pop("category", None)
         closest.pop("subcategories", None)
+        closest.pop("mtype", None)
         closest.pop("type", None)
         return closest
 
@@ -354,7 +360,7 @@ if __name__ == "__main__":
         "sector": "techologyyyyyyyy",
     }
     data_hander["name"] = "MSFT"
-    data_hander["submetatype"] = "POOP"
+    data_hander["submetatype"] = "DINGO"
     data_hander["abbreviation"] = "MSFT"
     data_hander.reset()
     data_hander.store_time_df(data_msft, is_bar=True)
@@ -367,14 +373,5 @@ if __name__ == "__main__":
     data_hander.time.change_lookback(microseconds=0, weeks=4, hours=0)
 
     while data_hander.is_next:
-
-        logger.success(data_hander.name)
-        logger.warning(data_hander.category)
-        logger.error(data_hander.subcategories)
-        logger.debug(data_hander.abbreviation)
-        logger.success(data_hander.submetatype)
-        
-        logger.success(data_hander.time.head)
-        logger.info(data_hander.time.head)
-        logger.success(data_hander.time.head)
+        logger.info(data_hander.closest_head())
         data_hander.time.step()

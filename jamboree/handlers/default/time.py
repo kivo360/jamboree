@@ -23,7 +23,6 @@ class TimeHandler(DBHandler):
             current_time:float = time_handler.head
         ```
     """
-
     def __init__(self):
         super().__init__()
         self.entity = "timeindexing"
@@ -104,7 +103,13 @@ class TimeHandler(DBHandler):
         return tail._epoch
 
     def change_lookback(
-        self, microseconds=1000, seconds=0, minutes=0, hours=10, days=0, weeks=0
+        self,
+        microseconds=1000,
+        seconds=0,
+        minutes=0,
+        hours=10,
+        days=0,
+        weeks=0
     ):
         self.load_lookback()
         if microseconds != 1000:
@@ -123,7 +128,13 @@ class TimeHandler(DBHandler):
         self.save_lookback()
 
     def change_stepsize(
-        self, microseconds=1000, seconds=0, minutes=0, hours=10, days=0, weeks=0
+        self,
+        microseconds=1000,
+        seconds=0,
+        minutes=0,
+        hours=10,
+        days=0,
+        weeks=0
     ):
         self.load_stepsize()
         if microseconds != 1000:
@@ -268,7 +279,8 @@ class TimeHandler(DBHandler):
         head = self.head
         step_params = self.stepsize_params
         lookahead_params = self.lookback_params
-        new_head = maya.MayaDT(head).add(**step_params).add(**lookahead_params)._epoch
+        new_head = maya.MayaDT(head).add(**step_params
+                                         ).add(**lookahead_params)._epoch
         return new_head
 
     def peak_back(self) -> float:
@@ -287,10 +299,8 @@ class TimeHandler(DBHandler):
         step_params = self.stepsize_params
         lookahead_params = self.lookback_params
         new_head = (
-            maya.MayaDT(head)
-            .subtract(**step_params)
-            .subtract(**lookahead_params)
-            ._epoch
+            maya.MayaDT(head).subtract(**step_params
+                                       ).subtract(**lookahead_params)._epoch
         )
         return new_head
 
@@ -343,16 +353,23 @@ class TimeHandler(DBHandler):
 
 
 if __name__ == "__main__":
+    """ 
+        Showcasing How We Manage Time Inside of The System. The localized time is persisted inside of the systems at a given id. We change the state dynamically.
+    """
     jambo = Jamboree()
     timehandler = TimeHandler()
     timehandler.processor = jambo
     eid = uuid.uuid4().hex
+    logger.debug(f"The episode id is: {eid}")
+    time.sleep(3)
     timehandler["episode"] = eid
     timehandler["live"] = False
     timehandler.reset()
 
-    timehandler.head = maya.MayaDT(timehandler.head).subtract(weeks=20, days=9)._epoch
+    timehandler.head = maya.MayaDT(timehandler.head
+                                   ).subtract(weeks=20, days=9)._epoch
+    # We're trying to determine how much we're stepping through our data.
     timehandler.change_stepsize(microseconds=0, days=1, hours=0)
     for _ in range(100):
-        logger.warning(maya.MayaDT(timehandler.head))
+        logger.success(maya.MayaDT(timehandler.head))
         timehandler.step()

@@ -10,7 +10,6 @@ from typing import Any, Dict, List, Optional
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
 # from cytoolz import unique
-
 """
 NOTE: 
 
@@ -94,7 +93,6 @@ from jamboree.utils.support.search import (
     to_field,
     to_str,
 )
-
 
 logger.disable(__name__)
 """
@@ -282,11 +280,15 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
         if self.current_client is None:
             # We would insert a connection here. Use the connection from the search processor to operate.
             with logger.catch(ResponseError):
-                self.current_client = Client(self.index, conn=self.processor.rconn)
+                self.current_client = Client(
+                    self.index, conn=self.processor.rconn
+                )
                 if len(self.indexable) > 0:
                     self.current_client.create_index(
                         self.indexable,
-                        stopwords=["but", "there", "these", "they", "this", "to"],
+                        stopwords=[
+                            "but", "there", "these", "they", "this", "to"
+                        ],
                     )
 
         if self.is_sub_key:
@@ -339,7 +341,10 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
             self["entity"] = {
                 "type": "TEXT",
                 "is_filter": True,
-                "values": {"is_exact": True, "term": self.entity},
+                "values": {
+                    "is_exact": True,
+                    "term": self.entity
+                },
             }
             self.is_set_entity = True
 
@@ -442,7 +447,6 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
 
     def sub_find(self):
         sup_ids, sub_ids = self.verbatim_sub_ids()
-        logger.success((sup_ids, sub_ids))
         if len(sub_ids) == 0:
             return []
         results = self.normal_find(limit_ids=sup_ids)
@@ -469,12 +473,16 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
         index_name = self.client.index_name
         fields = [i.redis_args()[0] for i in self.indexable]
         with logger.catch(message=f"{index_name} - {fields}", reraise=True):
-            self.client.add_document(_doc_id, payload=_doc_id, **insert_variables)
+            self.client.add_document(
+                _doc_id, payload=_doc_id, **insert_variables
+            )
 
         return _doc_id, True
 
     def sub_insert(self, allow_duplicates=False):
-        _super_id, _did_insert = self.normal_insert(allow_duplicates=allow_duplicates)
+        _super_id, _did_insert = self.normal_insert(
+            allow_duplicates=allow_duplicates
+        )
         # logger.info(f'Did insert: {_did_insert}')
         if _did_insert:
             for key, sub in self.subs.items():
@@ -566,7 +574,10 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
             batcher = self.client.batch_indexer(chunk_size=len(doc_ids))
             for doc_id in doc_ids:
                 batcher.add_document(
-                    doc_id, replace=True, partial=True, **replacement_variables
+                    doc_id,
+                    replace=True,
+                    partial=True,
+                    **replacement_variables
                 )
             batcher.commit()
         else:
@@ -575,14 +586,19 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
             batcher = self.client.batch_indexer(chunk_size=len(norm_ids))
             for doc_id in norm_ids:
                 batcher.add_document(
-                    doc_id, replace=True, partial=True, **replacement_variables
+                    doc_id,
+                    replace=True,
+                    partial=True,
+                    **replacement_variables
                 )
             batcher.commit()
 
             for sub in self.subs.values():
                 subreplacement = sub.insert_builder.build()
                 if len(subreplacement) > 0:
-                    subbatcher = sub.client.batch_indexer(chunk_size=len(sub_ids))
+                    subbatcher = sub.client.batch_indexer(
+                        chunk_size=len(sub_ids)
+                    )
                     for _id in sub_ids:
                         self.client.add_document(
                             _id, replace=True, partial=True, **subreplacement
@@ -622,7 +638,9 @@ class BaseSearchHandler(BaseSearchHandlerSupport):
         if self.use_sub_query:
             previous_id = self.sub_insert(allow_duplicates=allow_duplicates)
         else:
-            previous_id, _ = self.normal_insert(allow_duplicates=allow_duplicates)
+            previous_id, _ = self.normal_insert(
+                allow_duplicates=allow_duplicates
+            )
         return previous_id
 
     def remove(self):
@@ -697,14 +715,15 @@ def main():
 
     # example_handler.remove()
     example_handler.insert(allow_duplicates=True)
-    records = example_handler.find()
-    logger.warning((records, len(records)))
+    records1 = example_handler.find()
 
-    records = example_handler.find()
-    logger.warning((records, len(records)))
+    records2 = example_handler.find()
 
-    records = example_handler.find()
-    logger.warning((records, len(records)))
+    records3 = example_handler.find()
+
+    logger.warning((records1, len(records1)))
+    logger.success((records2, len(records2)))
+    logger.error((records3, len(records3)))
 
 
 if __name__ == "__main__":

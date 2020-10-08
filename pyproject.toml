@@ -39,6 +39,7 @@ pandas-datareader = "^0.8.1"
 pydantic = "^1.5.1"
 redisearch = "^0.9.0"
 matplotlib = "^3.2.1"
+pillow = "^7.2.0"
 
 
 
@@ -47,6 +48,7 @@ pylint = "^2.5.2"
 black = {version = "^19.10b0", allow-prereleases = true}
 flake8 = "^3.8.3"
 mypy = "^0.782"
+yapf = "^0.30.0"
 [build-system]
 requires = ["poetry>=0.12"]
 build-backend = "poetry.masonry.api"

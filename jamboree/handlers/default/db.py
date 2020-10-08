@@ -20,7 +20,6 @@ class DBHandler(BaseHandler):
         
         Currently uses zadd to work
     """
-
     def __init__(self):
         # print("DBHandler")
         self._metatype = "event"
@@ -131,15 +130,23 @@ class DBHandler(BaseHandler):
             raise AttributeError("Entity hasn't been set")
 
         if not bool(self._required):
-            raise AttributeError("None of the required information has been set")
+            raise AttributeError(
+                "None of the required information has been set"
+            )
 
         if not bool(self._query):
-            raise AttributeError("None of the queryable information has been set")
-
+            raise AttributeError(
+                "None of the queryable information has been set"
+            )
+        reqs = list(self._required.keys())
         for req in self._required.keys():
             _type = self._required[req]
+
             if req not in self._query:
-                raise AttributeError(f"{req} is not in the requirements")
+
+                raise AttributeError(
+                    f"{req} is not in the requirements: {reqs}"
+                )
             if not isinstance(self._query[req], _type):
                 raise AttributeError(f"{req} is not a {_type}")
         return True
@@ -160,13 +167,21 @@ class DBHandler(BaseHandler):
 
     def _last_by(self, time_index: float, ar="absolute", alt={}) -> dict:
         query = self.setup_query(alt)
-        return self.processor.event.get_latest_by(query, time_index, abs_rel=ar)
+        return self.processor.event.get_latest_by(
+            query, time_index, abs_rel=ar
+        )
 
     def _in_between(
-        self, min_epoch: float, max_epoch: float, ar: str = "absolute", alt={}
+        self,
+        min_epoch: float,
+        max_epoch: float,
+        ar: str = "absolute",
+        alt={}
     ):
         query = self.setup_query(alt)
-        return self.processor.event.get_between(query, min_epoch, max_epoch, abs_rel=ar)
+        return self.processor.event.get_between(
+            query, min_epoch, max_epoch, abs_rel=ar
+        )
 
     def save(self, data: dict, alt={}):
         self.check()
@@ -216,7 +231,11 @@ class DBHandler(BaseHandler):
         return item
 
     def in_between(
-        self, min_epoch: float, max_epoch: float, ar: str = "absolute", alt={}
+        self,
+        min_epoch: float,
+        max_epoch: float,
+        ar: str = "absolute",
+        alt={}
     ):
         self.check()
         if not self.main_helper.is_abs_rel(ar):
@@ -233,13 +252,17 @@ class DBHandler(BaseHandler):
     def get_single(self, alt={}, is_serialized=True):
         self.check()
         query = self.setup_query(alt)
-        item = self.processor.event.single_get(query, is_serialized=is_serialized)
+        item = self.processor.event.single_get(
+            query, is_serialized=is_serialized
+        )
         return item
 
     def set_single(self, data: dict, alt={}, is_serialized=True):
         self.check()
         query = self.setup_query(alt)
-        self.processor.event.single_set(query, data, is_serialized=is_serialized)
+        self.processor.event.single_set(
+            query, data, is_serialized=is_serialized
+        )
 
     def delete_single(self, alt={}, is_dumps=False):
         self.check()
